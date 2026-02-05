@@ -1,0 +1,1765 @@
+# 🤖 Frontend API Contract - Ethical AI Requirements Platform
+
+**Version:** 1.0.0  
+**Last Updated:** February 5, 2026  
+**Backend Base URL:** `http://localhost:8000`  
+**Target Audience:** Frontend Development Team  
+
+**Major Features in v1.0.0:**
+- ✅ Multi-framework ML model validation (scikit-learn, TensorFlow, PyTorch, ONNX)
+- ✅ Four ethical principles: Fairness, Transparency, Privacy, Accountability
+- ✅ JWT-based authentication with role support
+- ✅ 6 fairness metrics with Fairlearn integration
+- ✅ SHAP and LIME explainability engines
+- ✅ PII detection and k-anonymity checking
+- ✅ MLflow-based audit tracking
+- ✅ Complete validation pipeline
+
+---
+
+## ⚠️ CRITICAL: Read This First
+
+This document is the **SINGLE SOURCE OF TRUTH** for frontend-backend integration.
+
+### Rules of Engagement:
+
+1. **DO NOT assume any endpoint exists** unless documented here
+2. **DO NOT upload files directly** - use form-data with proper content types
+3. **MUST validate all user inputs** before sending to API
+4. **MUST handle all documented error codes**
+5. **MUST implement proper file upload with progress tracking**
+6. **DO NOT cache validation results** - always fetch fresh data
+
+---
+
+## 📋 Table of Contents
+
+1. [System Architecture Overview](#system-architecture-overview)
+2. [Authentication & Authorization](#authentication--authorization)
+3. [Role-Based Access Control](#role-based-access-control)
+4. [The Four Ethical Principles](#the-four-ethical-principles)
+5. [Validation Workflow](#validation-workflow)
+6. [API Endpoints](#api-endpoints)
+7. [Supported Model Formats](#supported-model-formats)
+8. [Dataset Requirements](#dataset-requirements)
+9. [Validation Results Structure](#validation-results-structure)
+10. [Error Handling](#error-handling)
+11. [Frontend UI Requirements](#frontend-ui-requirements)
+12. [Field Reference](#field-reference)
+13. [Integration Checklist](#integration-checklist)
+
+---
+
+## 🏗 System Architecture Overview
+
+### Backend Components (Frontend MUST Understand)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    FRONTEND (Your Responsibility)            │
+│  - Model Upload Forms                                       │
+│  - Dataset Upload Forms                                     │
+│  - Validation Dashboard                                     │
+│  - Results Visualization                                    │
+└────────────────┬────────────────────────────────────────────┘
+                 │
+                 │ HTTP REST API (FastAPI)
+                 │
+┌────────────────▼────────────────────────────────────────────┐
+│                    REST API SERVER                           │
+│  - Accepts model & dataset uploads                         │
+│  - Validates file formats                                   │
+│  - Triggers validation pipelines                            │
+│  - Returns validation results                               │
+└────────────────┬────────────────────────────────────────────┘
+                 │
+        ┌────────┴────────┐
+        │                 │
+        ▼                 ▼
+┌──────────────┐   ┌──────────────┐
+│  VALIDATION  │   │   TRACKING   │
+│   ENGINES    │   │  (MLflow)    │
+│              │   │              │
+│ - Fairness   │   │ - Audit logs │
+│ - Transparency│   │ - Versioning│
+│ - Privacy    │   │ - Reports   │
+│ - Account.   │   │             │
+└──────┬───────┘   └──────┬───────┘
+       │                  │
+       │                  │
+       └────────┬─────────┘
+                │
+                ▼
+        ┌──────────────┐
+        │   DATABASE   │
+        │ (PostgreSQL) │
+        └──────────────┘
+```
+
+### ⚠️ CRITICAL CONCEPTS
+
+| Concept | What Frontend MUST Understand |
+|---------|-------------------------------|
+| **Upload ≠ Validation** | Uploading a model/dataset does NOT validate it immediately. Validation is a separate step. |
+| **Async Operations** | Validations may take time. UI must handle long-running operations gracefully. |
+| **File Formats** | Only specific model formats supported (.pkl, .h5, .pt, .onnx). Check before upload. |
+| **Dataset Structure** | CSV must have specific columns for sensitive attributes (gender, race, age). |
+| **Principle Independence** | Each ethical principle (fairness, transparency, privacy, accountability) is validated separately. |
+
+---
+
+## 🔐 Authentication & Authorization
+
+### Current Status
+**Status:** ✅ **IMPLEMENTED - REQUIRED**  
+**Authentication Method:** JWT (JSON Web Tokens)  
+**Token Type:** Bearer Token  
+**Token Expiry:** 24 hours (access token), 7 days (refresh token)
+
+### Frontend MUST:
+1. Store tokens securely (localStorage or sessionStorage)
+2. Send access token in ALL API requests
+3. Handle token expiration (401 errors)
+4. Refresh token when needed
+5. Clear tokens on logout
+
+### Request Headers Required:
+```http
+Authorization: Bearer <ACCESS_TOKEN>
+Content-Type: application/json
+```
+
+### For File Uploads:
+```http
+Authorization: Bearer <ACCESS_TOKEN>
+Content-Type: multipart/form-data
+```
+
+---
+
+## 👥 Role-Based Access Control
+
+### User Roles
+
+| Role | Description | Permissions |
+|------|-------------|-------------|
+| **user** | Standard user | Create projects, upload models/datasets, run validations |
+| **admin** | System administrator | All user permissions + manage users, view all projects |
+| **auditor** | Compliance auditor | Read-only access to all validations and audit logs |
+
+### Permission Matrix
+
+| Action | user | admin | auditor |
+|--------|------|-------|---------|
+| Register account | ✅ | ✅ | ✅ |
+| Login | ✅ | ✅ | ✅ |
+| Create project | ✅ | ✅ | ❌ |
+| Upload model | ✅ | ✅ | ❌ |
+| Upload dataset | ✅ | ✅ | ❌ |
+| Run validation | ✅ | ✅ | ❌ |
+| View own validations | ✅ | ✅ | ✅ |
+| View all validations | ❌ | ✅ | ✅ |
+| View audit logs | ❌ | ✅ | ✅ |
+| Generate reports | ❌ | ✅ | ✅ |
+| Manage users | ❌ | ✅ | ❌ |
+
+---
+
+## 🎯 The Four Ethical Principles
+
+### How They Work Together
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     VALIDATION WORKFLOW                     │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│   1. Upload Model (.pkl, .h5, .pt, .onnx)                   │
+│                     ↓                                       │
+│   2. Upload Test Dataset (.csv with sensitive attributes)   │
+│                     ↓                                       │
+│   3. Select Ethical Requirements                            │
+│      • Use Template (e.g., ETH1-Finance)                    │
+│      • Or define custom thresholds                          │
+│                     ↓                                       │
+│   4. Run Validation Pipeline                                │
+│      ┌──────────────────────────────────────────────────┐   │
+│      │  PRIVACY → FAIRNESS → TRANSPARENCY → ACCOUNTABILITY  │
+│      └──────────────────────────────────────────────────┘   │
+│                     ↓                                       │
+│   5. Generate Report with Pass/Fail for each principle      │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Principle Details
+
+#### 1️⃣ Fairness
+**What it checks:** Does the model treat all demographic groups equally?
+
+**Metrics:**
+- Demographic Parity Ratio (≥ 0.8 to pass)
+- Equalized Odds Ratio (≥ 0.8 to pass)
+- Equal Opportunity Difference (≤ 0.1 to pass)
+- Disparate Impact Ratio (≥ 0.8 to pass)
+
+**Required Dataset Columns:**
+- At least one sensitive attribute: `gender`, `race`, `age`
+- Target column: `y_true` (actual outcomes)
+- Prediction column: `y_pred` (model predictions)
+
+#### 2️⃣ Transparency
+**What it checks:** Can we explain why the model makes its predictions?
+
+**Methods:**
+- SHAP (Global & Local explanations)
+- LIME (Local Interpretable Model-agnostic Explanations)
+- Model Cards (metadata documentation)
+
+**Outputs:**
+- Feature importance charts
+- Individual prediction explanations
+- Model architecture details
+
+#### 3️⃣ Privacy
+**What it checks:** Does the data contain PII? Is it properly anonymized?
+
+**Checks:**
+- PII Detection (names, emails, SSNs, phone numbers)
+- K-Anonymity (k ≥ 5 recommended)
+- L-Diversity (l ≥ 2 recommended)
+
+**Required Dataset Columns:**
+- Quasi-identifiers: columns that could identify individuals
+- Sensitive attributes: data requiring protection
+
+#### 4️⃣ Accountability
+**What it tracks:** Can we audit all validation activities?
+
+**Tracked Information:**
+- Who ran the validation (user_id)
+- When it was run (timestamp)
+- What model was used (model_id, version)
+- What dataset was used (dataset_id)
+- What results were produced (metrics, status)
+- Full lineage and versioning
+
+---
+
+## 🔄 Validation Workflow
+
+### Step-by-Step Process
+
+#### Step 1: Create Project
+```
+Frontend Action: User clicks "New Project"
+API Call: POST /api/v1/projects
+Result: Project ID returned
+```
+
+#### Step 2: Upload Model
+```
+Frontend Action: User selects .pkl/.h5/.pt/.onnx file
+API Call: POST /api/v1/models/upload
+Required: project_id, model file
+Result: Model ID returned + metadata extracted
+```
+
+#### Step 3: Upload Dataset
+```
+Frontend Action: User selects .csv file
+API Call: POST /api/v1/datasets/upload
+Required: project_id, CSV file with proper columns
+Result: Dataset ID returned + column analysis
+```
+
+#### Step 4: Select Requirements
+```
+Frontend Action: User chooses template OR custom thresholds
+Options:
+  - Template: ETH1-Finance, ETH2-Healthcare, ETH3-Education
+  - Custom: User defines metric thresholds
+Result: Requirement configuration stored
+```
+
+#### Step 5: Run Validation
+```
+Frontend Action: User clicks "Validate Model"
+API Call: POST /api/v1/validate
+Required: model_id, dataset_id, requirement_id
+Result: Validation run ID returned
+Status: RUNNING → Monitor progress
+```
+
+#### Step 6: View Results
+```
+Frontend Action: Poll or WebSocket for completion
+API Call: GET /api/v1/validations/{validation_id}
+Result: Complete validation report with:
+  - Fairness metrics (pass/fail)
+  - Transparency charts
+  - Privacy scores
+  - Audit trail
+```
+
+---
+
+## 🔌 API Endpoints
+
+### Base URL
+```
+Development: http://localhost:8000
+Production: [TO BE PROVIDED]
+```
+
+### Authentication Endpoints
+
+#### POST /api/v1/auth/register
+**Purpose:** Create new user account
+
+**Request Body:**
+```json
+{
+  "email": "user@example.com",
+  "password": "SecurePassword123!",
+  "full_name": "John Doe",
+  "role": "user"
+}
+```
+
+**Response (201 Created):**
+```json
+{
+  "id": "uuid-123",
+  "email": "user@example.com",
+  "full_name": "John Doe",
+  "role": "user",
+  "created_at": "2026-02-05T10:30:00Z"
+}
+```
+
+**Validation Rules:**
+- Email: Valid email format, unique
+- Password: Min 8 characters, must include uppercase, lowercase, number, special char
+- Role: One of ["user", "admin", "auditor"]
+
+**Error Codes:**
+- 400: Validation error (invalid email, weak password)
+- 409: Email already exists
+
+---
+
+#### POST /api/v1/auth/login
+**Purpose:** Authenticate user and get tokens
+
+**Request Body:**
+```json
+{
+  "email": "user@example.com",
+  "password": "SecurePassword123!"
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "bearer",
+  "expires_in": 86400
+}
+```
+
+**Frontend Actions:**
+1. Store both tokens securely
+2. Use access_token for all API calls
+3. Set timer for token refresh before expiry
+
+**Error Codes:**
+- 401: Invalid credentials
+- 404: User not found
+
+---
+
+#### POST /api/v1/auth/refresh
+**Purpose:** Get new access token using refresh token
+
+**Request Body:**
+```json
+{
+  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+**Response (200 OK):**
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "bearer",
+  "expires_in": 86400
+}
+```
+
+**Frontend Actions:**
+1. Replace old access_token with new one
+2. Continue making API calls
+3. Keep refresh_token unchanged
+
+**Error Codes:**
+- 401: Invalid or expired refresh token
+- 403: Refresh token revoked
+
+---
+
+#### GET /api/v1/auth/me
+**Purpose:** Get current user profile
+
+**Request Headers:**
+```http
+Authorization: Bearer <ACCESS_TOKEN>
+```
+
+**Response (200 OK):**
+```json
+{
+  "id": "uuid-123",
+  "email": "user@example.com",
+  "full_name": "John Doe",
+  "role": "user",
+  "created_at": "2026-02-05T10:30:00Z",
+  "projects_count": 5,
+  "validations_count": 12
+}
+```
+
+**Frontend Usage:**
+- Call on app startup to verify token validity
+- Display user info in navigation bar
+- Check role for UI permission controls
+
+**Error Codes:**
+- 401: Invalid or expired token
+
+---
+
+### Project Endpoints
+
+#### GET /api/v1/projects
+**Purpose:** List all projects for current user
+
+**Request Headers:**
+```http
+Authorization: Bearer <ACCESS_TOKEN>
+```
+
+**Query Parameters:**
+```
+?page=1
+&limit=20
+&sort=created_at
+&order=desc
+```
+
+**Response (200 OK):**
+```json
+{
+  "items": [
+    {
+      "id": "uuid-456",
+      "name": "Loan Approval Model",
+      "description": "Binary classification for loan approvals",
+      "created_by": "uuid-123",
+      "created_at": "2026-02-01T09:00:00Z",
+      "updated_at": "2026-02-05T14:20:00Z",
+      "models_count": 3,
+      "datasets_count": 2,
+      "validations_count": 8,
+      "status": "active"
+    }
+  ],
+  "total": 15,
+  "page": 1,
+  "limit": 20
+}
+```
+
+**Frontend Display:**
+- Show projects in cards or table
+- Display counts as badges
+- Sort by name or date
+- Add search/filter functionality
+
+---
+
+#### POST /api/v1/projects
+**Purpose:** Create new project
+
+**Request Headers:**
+```http
+Authorization: Bearer <ACCESS_TOKEN>
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+  "name": "Customer Churn Prediction",
+  "description": "Predicting customer churn for telecom company"
+}
+```
+
+**Response (201 Created):**
+```json
+{
+  "id": "uuid-789",
+  "name": "Customer Churn Prediction",
+  "description": "Predicting customer churn for telecom company",
+  "created_by": "uuid-123",
+  "created_at": "2026-02-05T15:00:00Z",
+  "status": "active"
+}
+```
+
+**Validation Rules:**
+- Name: Required, 3-100 characters, unique per user
+- Description: Optional, max 500 characters
+
+**Error Codes:**
+- 400: Validation error
+- 409: Project name already exists
+
+---
+
+### Model Upload Endpoints
+
+#### POST /api/v1/models/upload
+**Purpose:** Upload ML model file
+
+**Request Headers:**
+```http
+Authorization: Bearer <ACCESS_TOKEN>
+Content-Type: multipart/form-data
+```
+
+**Request Body (Form Data):**
+```
+project_id: uuid-456
+name: loan_model_v3
+description: Logistic regression with feature engineering
+file: <binary model file>
+model_type: sklearn
+framework_version: 1.3.0
+```
+
+**Supported File Types:**
+| Extension | Framework | Max Size |
+|-----------|-----------|----------|
+| .pkl, .joblib, .pickle | scikit-learn | 100 MB |
+| .h5, .keras | TensorFlow/Keras | 500 MB |
+| .pt, .pth | PyTorch | 500 MB |
+| .onnx | ONNX Runtime | 500 MB |
+
+**Response (201 Created):**
+```json
+{
+  "id": "uuid-model-123",
+  "project_id": "uuid-456",
+  "name": "loan_model_v3",
+  "description": "Logistic regression with feature engineering",
+  "file_path": "/uploads/models/loan_model_v3.pkl",
+  "file_size": 15728640,
+  "model_type": "sklearn",
+  "framework": "scikit-learn",
+  "framework_version": "1.3.0",
+  "model_class": "LogisticRegression",
+  "features_count": 25,
+  "created_at": "2026-02-05T15:30:00Z",
+  "status": "ready"
+}
+```
+
+**Frontend Implementation:**
+```javascript
+const uploadModel = async (projectId, modelFile, metadata) => {
+  const formData = new FormData();
+  formData.append('project_id', projectId);
+  formData.append('name', metadata.name);
+  formData.append('description', metadata.description);
+  formData.append('file', modelFile);
+  formData.append('model_type', metadata.modelType);
+  formData.append('framework_version', metadata.frameworkVersion);
+
+  const response = await fetch('/api/v1/models/upload', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      // DON'T set Content-Type - browser sets it with boundary
+    },
+    body: formData,
+    // Track upload progress
+    onUploadProgress: (progressEvent) => {
+      const percentCompleted = Math.round(
+        (progressEvent.loaded * 100) / progressEvent.total
+      );
+      updateProgress(percentCompleted);
+    }
+  });
+
+  return await response.json();
+};
+```
+
+**Validation Rules:**
+- File must be one of supported extensions
+- File size must not exceed max limit
+- Model must be loadable (backend validates)
+- Name must be unique within project
+
+**Error Codes:**
+- 400: Invalid file format or validation error
+- 413: File too large
+- 415: Unsupported media type
+- 422: Model file corrupted or unloadable
+
+---
+
+### Dataset Upload Endpoints
+
+#### POST /api/v1/datasets/upload
+**Purpose:** Upload dataset for validation
+
+**Request Headers:**
+```http
+Authorization: Bearer <ACCESS_TOKEN>
+Content-Type: multipart/form-data
+```
+
+**Request Body (Form Data):**
+```
+project_id: uuid-456
+name: test_data_q1_2026
+description: Q1 2026 test data with demographics
+file: <CSV file>
+sensitive_attributes: ["gender", "race", "age"]
+target_column: y_true
+prediction_column: y_pred
+```
+
+**Required CSV Columns:**
+```csv
+gender,race,age,income,credit_score,y_true,y_pred
+male,white,35,75000,720,1,1
+female,black,28,45000,650,0,0
+male,asian,42,90000,780,1,1
+...
+```
+
+**Column Requirements:**
+| Column Type | Required | Description |
+|-------------|----------|-------------|
+| Sensitive Attributes | Yes | At least 1: gender, race, age, etc. |
+| Target Column | Yes | Actual outcomes (ground truth) |
+| Prediction Column | Yes | Model predictions |
+| Features | Optional | Additional columns for analysis |
+
+**Response (201 Created):**
+```json
+{
+  "id": "uuid-dataset-123",
+  "project_id": "uuid-456",
+  "name": "test_data_q1_2026",
+  "description": "Q1 2026 test data with demographics",
+  "file_path": "/uploads/datasets/test_data_q1_2026.csv",
+  "file_size": 5242880,
+  "rows_count": 10000,
+  "columns_count": 15,
+  "columns": [
+    "gender", "race", "age", "income", "credit_score",
+    "y_true", "y_pred"
+  ],
+  "sensitive_attributes": ["gender", "race", "age"],
+  "target_column": "y_true",
+  "prediction_column": "y_pred",
+  "missing_values": {
+    "gender": 0,
+    "race": 0,
+    "age": 5
+  },
+  "created_at": "2026-02-05T15:45:00Z",
+  "status": "ready"
+}
+```
+
+**Frontend Validation Before Upload:**
+```javascript
+const validateDataset = (file) => {
+  // Check file type
+  if (!file.name.endsWith('.csv')) {
+    throw new Error('Only CSV files are supported');
+  }
+
+  // Check file size (max 100 MB)
+  if (file.size > 100 * 1024 * 1024) {
+    throw new Error('File size must not exceed 100 MB');
+  }
+
+  // Read first few rows to validate columns
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const text = e.target.result;
+    const firstLine = text.split('\n')[0];
+    const columns = firstLine.split(',');
+
+    // Check for required columns
+    const hasTarget = columns.includes('y_true');
+    const hasPrediction = columns.includes('y_pred');
+    const hasSensitive = columns.some(col => 
+      ['gender', 'race', 'age'].includes(col)
+    );
+
+    if (!hasTarget || !hasPrediction || !hasSensitive) {
+      throw new Error(
+        'CSV must include y_true, y_pred, and at least one sensitive attribute'
+      );
+    }
+  };
+  reader.readAsText(file.slice(0, 1024)); // Read first 1KB
+};
+```
+
+**Error Codes:**
+- 400: Invalid file format or missing required columns
+- 413: File too large
+- 422: CSV parsing error or data validation failed
+
+---
+
+### Validation Endpoints
+
+#### POST /api/v1/validate
+**Purpose:** Run complete ethical validation
+
+**Request Headers:**
+```http
+Authorization: Bearer <ACCESS_TOKEN>
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+  "model_id": "uuid-model-123",
+  "dataset_id": "uuid-dataset-123",
+  "requirement_id": "uuid-req-001",
+  "principles": ["fairness", "transparency", "privacy", "accountability"],
+  "thresholds": {
+    "fairness": {
+      "demographic_parity_ratio": 0.8,
+      "equalized_odds_ratio": 0.8
+    },
+    "privacy": {
+      "k_anonymity": 5,
+      "l_diversity": 2
+    }
+  }
+}
+```
+
+**Response (202 Accepted):**
+```json
+{
+  "validation_id": "uuid-validation-123",
+  "status": "RUNNING",
+  "model_id": "uuid-model-123",
+  "dataset_id": "uuid-dataset-123",
+  "principles": ["fairness", "transparency", "privacy", "accountability"],
+  "started_at": "2026-02-05T16:00:00Z",
+  "estimated_duration": 300,
+  "progress_url": "/api/v1/validations/uuid-validation-123"
+}
+```
+
+**Frontend Actions:**
+1. Show "Validation Running" modal with progress bar
+2. Poll progress_url every 5 seconds OR use WebSocket
+3. Display estimated time remaining
+4. Allow cancellation (if supported)
+
+**Validation States:**
+```
+RUNNING → COMPLETED (success)
+        → FAILED (error occurred)
+        → CANCELLED (user cancelled)
+```
+
+**Error Codes:**
+- 400: Invalid request (missing model_id or dataset_id)
+- 404: Model or dataset not found
+- 409: Validation already running for this model/dataset pair
+- 422: Model and dataset incompatible (feature mismatch)
+
+---
+
+#### GET /api/v1/validations/{validation_id}
+**Purpose:** Get validation status and results
+
+**Request Headers:**
+```http
+Authorization: Bearer <ACCESS_TOKEN>
+```
+
+**Response (200 OK) - When RUNNING:**
+```json
+{
+  "id": "uuid-validation-123",
+  "status": "RUNNING",
+  "progress": 45,
+  "current_step": "Running fairness validation",
+  "steps_completed": ["privacy", "fairness"],
+  "steps_remaining": ["transparency", "accountability"],
+  "started_at": "2026-02-05T16:00:00Z",
+  "estimated_completion": "2026-02-05T16:05:00Z"
+}
+```
+
+**Response (200 OK) - When COMPLETED:**
+```json
+{
+  "id": "uuid-validation-123",
+  "status": "COMPLETED",
+  "model_id": "uuid-model-123",
+  "dataset_id": "uuid-dataset-123",
+  "started_at": "2026-02-05T16:00:00Z",
+  "completed_at": "2026-02-05T16:04:30Z",
+  "duration": 270,
+  "results": {
+    "fairness": {
+      "status": "PASSED",
+      "metrics": {
+        "demographic_parity_ratio": 0.85,
+        "demographic_parity_difference": 0.08,
+        "equalized_odds_ratio": 0.82,
+        "disparate_impact_ratio": 0.87
+      },
+      "thresholds": {
+        "demographic_parity_ratio": 0.8,
+        "equalized_odds_ratio": 0.8
+      },
+      "sensitive_attribute": "gender",
+      "groups": {
+        "male": {"selection_rate": 0.65, "tpr": 0.85, "fpr": 0.12},
+        "female": {"selection_rate": 0.55, "tpr": 0.78, "fpr": 0.15}
+      }
+    },
+    "transparency": {
+      "status": "PASSED",
+      "shap_available": true,
+      "lime_available": true,
+      "top_features": [
+        {"name": "credit_score", "importance": 0.35},
+        {"name": "income", "importance": 0.28},
+        {"name": "age", "importance": 0.15}
+      ],
+      "charts": {
+        "shap_summary": "/results/shap_summary_123.png",
+        "feature_importance": "/results/feature_importance_123.png"
+      }
+    },
+    "privacy": {
+      "status": "WARNING",
+      "pii_detected": {
+        "email": 0,
+        "phone": 0,
+        "ssn": 0,
+        "name": 0
+      },
+      "k_anonymity": {
+        "k_value": 4,
+        "threshold": 5,
+        "passed": false,
+        "groups_below_threshold": 12
+      },
+      "l_diversity": {
+        "l_value": 2,
+        "threshold": 2,
+        "passed": true
+      }
+    },
+    "accountability": {
+      "status": "PASSED",
+      "mlflow_run_id": "run-abc-123",
+      "audit_log_id": "audit-xyz-456",
+      "user_id": "uuid-123",
+      "model_version": "v3",
+      "dataset_version": "v1",
+      "reproducible": true
+    }
+  },
+  "overall_status": "PASSED_WITH_WARNINGS",
+  "report_url": "/api/v1/validations/uuid-validation-123/report"
+}
+```
+
+**Frontend Display:**
+- Show status badge (PASSED, FAILED, WARNING)
+- Display metrics in cards
+- Visualize charts inline
+- Highlight failed metrics in red
+- Show expandable details for each principle
+- Download button for full report
+
+**Error Codes:**
+- 404: Validation not found
+- 403: Not authorized to view this validation
+
+---
+
+#### GET /api/v1/validations/{validation_id}/report
+**Purpose:** Download full validation report (PDF)
+
+**Request Headers:**
+```http
+Authorization: Bearer <ACCESS_TOKEN>
+```
+
+**Response (200 OK):**
+- Content-Type: `application/pdf`
+- Binary PDF file with complete report
+- Filename: `validation_report_{validation_id}.pdf`
+
+**Frontend Implementation:**
+```javascript
+const downloadReport = async (validationId) => {
+  const response = await fetch(
+    `/api/v1/validations/${validationId}/report`,
+    {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`
+      }
+    }
+  );
+
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `validation_report_${validationId}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  window.URL.revokeObjectURL(url);
+  document.body.removeChild(a);
+};
+```
+
+---
+
+## 📦 Supported Model Formats
+
+### Model Loading Capabilities
+
+| Framework | Extensions | Status | Notes |
+|-----------|------------|--------|-------|
+| **scikit-learn** | `.pkl`, `.joblib`, `.pickle` | ✅ Fully Supported | Most common format |
+| **TensorFlow/Keras** | `.h5`, `.keras`, SavedModel dirs | ✅ Fully Supported | Requires TensorFlow installed |
+| **PyTorch** | `.pt`, `.pth` | ✅ Fully Supported | Must be full model, not state_dict |
+| **ONNX** | `.onnx` | ✅ Fully Supported | Cross-framework format |
+
+### Model Type Detection
+
+Backend automatically detects:
+- Model framework
+- Model class (e.g., LogisticRegression, RandomForest)
+- Number of features expected
+- Input/output shapes
+- Framework version
+
+**Frontend Responsibility:**
+- Validate file extension before upload
+- Show appropriate upload UI based on framework
+- Display detected metadata after upload
+
+### ⚠️ Known Limitations
+
+| Limitation | Impact | Workaround |
+|------------|--------|------------|
+| PyTorch state_dict not supported | Upload fails | Save full model with `torch.save(model, path)` |
+| Custom classes need definition | Loading fails | Include custom class in upload or use ONNX |
+| TensorFlow < 2.0 deprecated | May fail | Upgrade to TensorFlow 2.x |
+| Models > 500 MB | Upload times out | Compress or use ONNX format |
+
+---
+
+## 📊 Dataset Requirements
+
+### CSV Structure
+
+**CRITICAL: Frontend MUST validate these requirements before upload**
+
+#### Required Columns
+
+| Column | Type | Description | Example Values |
+|--------|------|-------------|----------------|
+| **Sensitive Attribute** | string/int | At least 1 required (gender, race, age, etc.) | "male", "female", "non-binary" |
+| **y_true** | int/float | Ground truth labels | 0, 1 (binary) or 0, 1, 2 (multi-class) |
+| **y_pred** | int/float | Model predictions | 0, 1 or probabilities [0.0-1.0] |
+
+#### Optional Columns
+
+| Column | Purpose | Example |
+|--------|---------|---------|
+| **Features** | Model inputs | income, credit_score, etc. |
+| **ID** | Row identifier | customer_id, transaction_id |
+| **Timestamp** | Temporal data | 2026-02-05T10:30:00Z |
+
+### Example CSV
+
+```csv
+customer_id,gender,race,age,income,credit_score,y_true,y_pred
+C001,male,white,35,75000,720,1,1
+C002,female,black,28,45000,650,0,0
+C003,male,asian,42,90000,780,1,1
+C004,female,hispanic,31,55000,680,0,1
+C005,non-binary,white,39,65000,700,1,1
+```
+
+### Validation Rules
+
+**Frontend MUST check:**
+1. File is valid CSV format
+2. Has header row with column names
+3. Contains required columns (y_true, y_pred, at least 1 sensitive attribute)
+4. No completely empty columns
+5. Sensitive attributes have at least 2 unique values
+6. y_true and y_pred have matching data types
+7. File size under 100 MB
+
+**Backend WILL check:**
+1. CSV is parseable
+2. Columns match expected types
+3. No missing values in required columns
+4. Sufficient rows for statistical analysis (min 100 recommended)
+5. Sensitive attributes are categorical
+6. Target and prediction columns are numeric
+
+### Frontend Validation Example
+
+```javascript
+const validateCSV = async (file) => {
+  const errors = [];
+
+  // Check file type
+  if (!file.name.endsWith('.csv')) {
+    errors.push('File must be a CSV');
+  }
+
+  // Check file size (100 MB limit)
+  if (file.size > 100 * 1024 * 1024) {
+    errors.push('File size must not exceed 100 MB');
+  }
+
+  // Parse first few rows
+  const text = await file.slice(0, 10000).text();
+  const lines = text.split('\n');
+  
+  if (lines.length < 2) {
+    errors.push('CSV must have at least header + 1 data row');
+  }
+
+  const header = lines[0].split(',').map(col => col.trim());
+  
+  // Check for required columns
+  if (!header.includes('y_true')) {
+    errors.push('Missing required column: y_true');
+  }
+  if (!header.includes('y_pred')) {
+    errors.push('Missing required column: y_pred');
+  }
+
+  const sensitiveAttrs = ['gender', 'race', 'age', 'ethnicity'];
+  const hasSensitive = header.some(col => 
+    sensitiveAttrs.includes(col.toLowerCase())
+  );
+  
+  if (!hasSensitive) {
+    errors.push('Must include at least one sensitive attribute: gender, race, age, or ethnicity');
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+    columns: header,
+    rowCount: lines.length - 1
+  };
+};
+```
+
+---
+
+## 📋 Validation Results Structure
+
+### Result Object Schema
+
+```typescript
+interface ValidationResult {
+  id: string;
+  status: 'PASSED' | 'FAILED' | 'PASSED_WITH_WARNINGS';
+  model_id: string;
+  dataset_id: string;
+  started_at: string; // ISO 8601
+  completed_at: string; // ISO 8601
+  duration: number; // seconds
+  
+  results: {
+    fairness?: FairnessResult;
+    transparency?: TransparencyResult;
+    privacy?: PrivacyResult;
+    accountability?: AccountabilityResult;
+  };
+}
+
+interface FairnessResult {
+  status: 'PASSED' | 'FAILED' | 'WARNING';
+  metrics: {
+    demographic_parity_ratio: number;
+    demographic_parity_difference: number;
+    equalized_odds_ratio: number;
+    equalized_odds_difference: number;
+    equal_opportunity_difference: number;
+    disparate_impact_ratio: number;
+  };
+  thresholds: {
+    demographic_parity_ratio: number;
+    equalized_odds_ratio: number;
+  };
+  sensitive_attribute: string;
+  groups: Record<string, GroupMetrics>;
+}
+
+interface GroupMetrics {
+  selection_rate: number;
+  tpr: number; // True Positive Rate
+  fpr: number; // False Positive Rate
+  count: number;
+  percentage: number;
+}
+
+interface TransparencyResult {
+  status: 'PASSED' | 'FAILED';
+  shap_available: boolean;
+  lime_available: boolean;
+  top_features: Array<{
+    name: string;
+    importance: number;
+  }>;
+  charts: {
+    shap_summary?: string; // URL to chart
+    feature_importance?: string; // URL to chart
+  };
+}
+
+interface PrivacyResult {
+  status: 'PASSED' | 'WARNING' | 'FAILED';
+  pii_detected: {
+    email: number;
+    phone: number;
+    ssn: number;
+    name: number;
+  };
+  k_anonymity: {
+    k_value: number;
+    threshold: number;
+    passed: boolean;
+    groups_below_threshold: number;
+  };
+  l_diversity: {
+    l_value: number;
+    threshold: number;
+    passed: boolean;
+  };
+}
+
+interface AccountabilityResult {
+  status: 'PASSED';
+  mlflow_run_id: string;
+  audit_log_id: string;
+  user_id: string;
+  model_version: string;
+  dataset_version: string;
+  reproducible: boolean;
+}
+```
+
+### Display Recommendations
+
+#### Status Colors
+```css
+.status-passed {
+  background-color: #4caf50; /* Green */
+}
+
+.status-warning {
+  background-color: #ff9800; /* Orange */
+}
+
+.status-failed {
+  background-color: #f44336; /* Red */
+}
+```
+
+#### Metric Cards
+```jsx
+<Card>
+  <CardHeader title="Demographic Parity Ratio" />
+  <CardContent>
+    <Typography variant="h3">
+      {result.metrics.demographic_parity_ratio.toFixed(3)}
+    </Typography>
+    <Typography variant="body2" color="textSecondary">
+      Threshold: ≥ {result.thresholds.demographic_parity_ratio}
+    </Typography>
+    <LinearProgress 
+      value={result.metrics.demographic_parity_ratio * 100}
+      variant="determinate"
+      color={result.metrics.demographic_parity_ratio >= 0.8 ? 'success' : 'error'}
+    />
+  </CardContent>
+</Card>
+```
+
+#### Charts Display
+```jsx
+{result.transparency.charts.shap_summary && (
+  <img 
+    src={result.transparency.charts.shap_summary}
+    alt="SHAP Summary Plot"
+    style={{ width: '100%', maxWidth: '800px' }}
+  />
+)}
+```
+
+---
+
+## ⚠️ Error Handling
+
+### HTTP Status Codes
+
+| Code | Meaning | Frontend Action |
+|------|---------|-----------------|
+| 200 | OK | Display response data |
+| 201 | Created | Show success message, redirect |
+| 202 | Accepted | Start polling for completion |
+| 400 | Bad Request | Show validation errors to user |
+| 401 | Unauthorized | Redirect to login, refresh token |
+| 403 | Forbidden | Show "Access Denied" message |
+| 404 | Not Found | Show "Resource not found" |
+| 409 | Conflict | Show conflict message (e.g., "Name already exists") |
+| 413 | Payload Too Large | Show "File too large" error |
+| 415 | Unsupported Media Type | Show "Invalid file type" error |
+| 422 | Unprocessable Entity | Show detailed validation errors |
+| 429 | Too Many Requests | Show "Rate limit exceeded", retry with backoff |
+| 500 | Internal Server Error | Show generic error, contact support |
+| 503 | Service Unavailable | Show "Service temporarily unavailable", retry |
+
+### Error Response Format
+
+```json
+{
+  "detail": "Validation error",
+  "errors": [
+    {
+      "field": "password",
+      "message": "Password must be at least 8 characters",
+      "type": "value_error"
+    },
+    {
+      "field": "email",
+      "message": "Invalid email format",
+      "type": "value_error"
+    }
+  ]
+}
+```
+
+### Frontend Error Handling Example
+
+```javascript
+const handleAPIError = (error) => {
+  if (error.response) {
+    // Server responded with error status
+    const { status, data } = error.response;
+
+    switch (status) {
+      case 400:
+        // Validation errors
+        if (data.errors) {
+          data.errors.forEach(err => {
+            showFieldError(err.field, err.message);
+          });
+        } else {
+          showToast(data.detail, 'error');
+        }
+        break;
+
+      case 401:
+        // Unauthorized - try refresh token
+        if (refreshToken) {
+          await refreshAccessToken();
+          // Retry original request
+        } else {
+          // No refresh token, redirect to login
+          navigate('/login');
+        }
+        break;
+
+      case 403:
+        showToast('Access denied', 'error');
+        break;
+
+      case 404:
+        showToast('Resource not found', 'error');
+        break;
+
+      case 409:
+        showToast(data.detail, 'warning');
+        break;
+
+      case 413:
+        showToast('File too large. Maximum size is 100 MB', 'error');
+        break;
+
+      case 422:
+        showToast(data.detail, 'error');
+        break;
+
+      case 429:
+        showToast('Too many requests. Please try again later', 'warning');
+        // Implement exponential backoff
+        break;
+
+      case 500:
+      case 503:
+        showToast(
+          'Service temporarily unavailable. Please try again',
+          'error'
+        );
+        break;
+
+      default:
+        showToast('An unexpected error occurred', 'error');
+    }
+  } else if (error.request) {
+    // Request made but no response
+    showToast('Network error. Please check your connection', 'error');
+  } else {
+    // Something else happened
+    showToast(error.message, 'error');
+  }
+};
+```
+
+---
+
+## 🎨 Frontend UI Requirements
+
+### Must-Have Components
+
+#### 1. Authentication Flow
+- [ ] Login page with email/password
+- [ ] Register page with role selection
+- [ ] "Forgot Password" flow (if implemented)
+- [ ] Logout button in navigation
+- [ ] Protected routes (redirect to login if not authenticated)
+- [ ] Token refresh logic
+
+#### 2. Project Management
+- [ ] Projects list page (cards or table)
+- [ ] Create project modal/form
+- [ ] Project details page
+- [ ] Edit project form
+- [ ] Delete project confirmation
+
+#### 3. Model Upload
+- [ ] Drag-and-drop file upload
+- [ ] File type validation (.pkl, .h5, .pt, .onnx)
+- [ ] Upload progress bar
+- [ ] Model metadata display after upload
+- [ ] Model version history (if multiple uploads)
+
+#### 4. Dataset Upload
+- [ ] CSV file upload
+- [ ] Column preview before upload
+- [ ] Sensitive attribute selection
+- [ ] Target/prediction column selection
+- [ ] Data quality warnings (missing values, etc.)
+
+#### 5. Validation Dashboard
+- [ ] Select model and dataset dropdowns
+- [ ] Choose principles to validate (checkboxes)
+- [ ] Custom threshold inputs (optional)
+- [ ] "Run Validation" button
+- [ ] Real-time progress indicator
+- [ ] Cancel validation button
+
+#### 6. Results Display
+- [ ] Validation history table
+- [ ] Individual validation result cards
+- [ ] Metrics visualization (gauges, progress bars)
+- [ ] Charts display (SHAP, feature importance)
+- [ ] Group comparison tables (fairness)
+- [ ] Download report button
+- [ ] Export results to CSV
+
+#### 7. Navigation & Layout
+- [ ] Sidebar with navigation links
+- [ ] Top app bar with user menu
+- [ ] Breadcrumbs for deep navigation
+- [ ] Mobile-responsive design
+- [ ] Dark mode toggle (optional)
+
+### UI State Management
+
+#### Loading States
+```jsx
+<Button 
+  disabled={isLoading}
+  startIcon={isLoading ? <CircularProgress size={20} /> : null}
+>
+  {isLoading ? 'Uploading...' : 'Upload Model'}
+</Button>
+```
+
+#### Empty States
+```jsx
+{projects.length === 0 ? (
+  <EmptyState
+    icon={<FolderIcon />}
+    title="No projects yet"
+    description="Create your first project to get started"
+    action={<Button onClick={handleCreateProject}>Create Project</Button>}
+  />
+) : (
+  <ProjectsList projects={projects} />
+)}
+```
+
+#### Error States
+```jsx
+{error && (
+  <Alert severity="error" onClose={handleCloseError}>
+    {error.message}
+  </Alert>
+)}
+```
+
+---
+
+## 📑 Field Reference
+
+### User Fields
+
+| Field | Type | Required | Editable | Description |
+|-------|------|----------|----------|-------------|
+| id | UUID | Auto | No | Unique user identifier |
+| email | string | Yes | Yes | User email (unique) |
+| password | string | Yes | Yes | Hashed password (never returned) |
+| full_name | string | Yes | Yes | User display name |
+| role | enum | Yes | Admin only | One of: user, admin, auditor |
+| created_at | datetime | Auto | No | Account creation timestamp |
+| updated_at | datetime | Auto | No | Last profile update |
+| is_active | boolean | Auto | Admin only | Account status |
+
+### Project Fields
+
+| Field | Type | Required | Editable | Description |
+|-------|------|----------|----------|-------------|
+| id | UUID | Auto | No | Unique project identifier |
+| name | string | Yes | Yes | Project name (unique per user) |
+| description | string | No | Yes | Project description |
+| created_by | UUID | Auto | No | Creator user ID |
+| created_at | datetime | Auto | No | Creation timestamp |
+| updated_at | datetime | Auto | No | Last update timestamp |
+| status | enum | Auto | No | active, archived |
+| models_count | int | Auto | No | Number of models uploaded |
+| datasets_count | int | Auto | No | Number of datasets uploaded |
+| validations_count | int | Auto | No | Number of validations run |
+
+### Model Fields
+
+| Field | Type | Required | Editable | Description |
+|-------|------|----------|----------|-------------|
+| id | UUID | Auto | No | Unique model identifier |
+| project_id | UUID | Yes | No | Parent project ID |
+| name | string | Yes | Yes | Model name |
+| description | string | No | Yes | Model description |
+| file_path | string | Auto | No | Server file path |
+| file_size | int | Auto | No | File size in bytes |
+| model_type | enum | Yes | No | sklearn, tensorflow, pytorch, onnx |
+| framework | string | Auto | No | Detected framework name |
+| framework_version | string | Optional | No | Framework version |
+| model_class | string | Auto | No | Model class name |
+| features_count | int | Auto | No | Expected number of features |
+| created_at | datetime | Auto | No | Upload timestamp |
+| status | enum | Auto | No | ready, error |
+
+### Dataset Fields
+
+| Field | Type | Required | Editable | Description |
+|-------|------|----------|----------|-------------|
+| id | UUID | Auto | No | Unique dataset identifier |
+| project_id | UUID | Yes | No | Parent project ID |
+| name | string | Yes | Yes | Dataset name |
+| description | string | No | Yes | Dataset description |
+| file_path | string | Auto | No | Server file path |
+| file_size | int | Auto | No | File size in bytes |
+| rows_count | int | Auto | No | Number of rows |
+| columns_count | int | Auto | No | Number of columns |
+| columns | array | Auto | No | List of column names |
+| sensitive_attributes | array | Yes | No | Sensitive attribute columns |
+| target_column | string | Yes | No | Ground truth column |
+| prediction_column | string | Yes | No | Prediction column |
+| missing_values | object | Auto | No | Missing value counts per column |
+| created_at | datetime | Auto | No | Upload timestamp |
+| status | enum | Auto | No | ready, error |
+
+### Validation Fields
+
+| Field | Type | Required | Editable | Description |
+|-------|------|----------|----------|-------------|
+| id | UUID | Auto | No | Unique validation identifier |
+| model_id | UUID | Yes | No | Model being validated |
+| dataset_id | UUID | Yes | No | Dataset used for validation |
+| requirement_id | UUID | Optional | No | Requirement template used |
+| principles | array | Yes | No | List of principles to validate |
+| status | enum | Auto | No | RUNNING, COMPLETED, FAILED, CANCELLED |
+| progress | int | Auto | No | Progress percentage (0-100) |
+| current_step | string | Auto | No | Current validation step |
+| results | object | Auto | No | Complete validation results |
+| started_at | datetime | Auto | No | Start timestamp |
+| completed_at | datetime | Auto | No | Completion timestamp |
+| duration | int | Auto | No | Duration in seconds |
+| created_by | UUID | Auto | No | User who ran validation |
+
+---
+
+## ✅ Integration Checklist
+
+### Phase 1: Authentication ✅ REQUIRED
+
+- [ ] Implement login page
+- [ ] Implement registration page
+- [ ] Store JWT tokens securely
+- [ ] Add Authorization header to all API calls
+- [ ] Implement token refresh logic
+- [ ] Handle 401 errors (redirect to login)
+- [ ] Add logout functionality
+- [ ] Display user info in navigation
+
+### Phase 2: Project Management ✅ REQUIRED
+
+- [ ] List projects page
+- [ ] Create project form
+- [ ] Project details page
+- [ ] Edit project functionality
+- [ ] Delete project with confirmation
+- [ ] Filter/search projects
+- [ ] Sort projects by date/name
+
+### Phase 3: Model Upload ✅ REQUIRED
+
+- [ ] Drag-and-drop file upload
+- [ ] File type validation (frontend)
+- [ ] File size validation (frontend)
+- [ ] Upload progress bar
+- [ ] Display model metadata after upload
+- [ ] List uploaded models
+- [ ] Delete model functionality
+- [ ] Handle upload errors gracefully
+
+### Phase 4: Dataset Upload ✅ REQUIRED
+
+- [ ] CSV file upload
+- [ ] Parse and preview CSV columns
+- [ ] Validate required columns (frontend)
+- [ ] Select sensitive attributes
+- [ ] Select target/prediction columns
+- [ ] Display dataset statistics
+- [ ] Handle missing values warnings
+- [ ] Delete dataset functionality
+
+### Phase 5: Validation Execution ✅ REQUIRED
+
+- [ ] Select model and dataset dropdowns
+- [ ] Choose validation principles (checkboxes)
+- [ ] Input custom thresholds (optional)
+- [ ] "Run Validation" button
+- [ ] Real-time progress display
+- [ ] Poll for validation status
+- [ ] Handle validation errors
+- [ ] Cancel validation (if supported)
+
+### Phase 6: Results Display ✅ REQUIRED
+
+- [ ] Validation history table
+- [ ] Individual validation result page
+- [ ] Display metrics in cards
+- [ ] Show charts (SHAP, feature importance)
+- [ ] Group comparison tables
+- [ ] Status badges (PASSED, FAILED, WARNING)
+- [ ] Download PDF report button
+- [ ] Export results to CSV
+
+### Phase 7: UX Enhancements ⚠️ RECOMMENDED
+
+- [ ] Toast notifications
+- [ ] Loading skeletons
+- [ ] Empty states
+- [ ] Error boundaries
+- [ ] Confirmation modals
+- [ ] Tooltips for metrics
+- [ ] Keyboard shortcuts
+- [ ] Responsive design
+- [ ] Dark mode
+
+### Phase 8: Advanced Features ⚠️ NICE TO HAVE
+
+- [ ] Batch validation (multiple models)
+- [ ] Schedule validations
+- [ ] Email notifications
+- [ ] Collaborative features (comments)
+- [ ] Export audit trail
+- [ ] Advanced filtering
+- [ ] Data visualization dashboard
+- [ ] Compare multiple validations
+
+---
+
+## 🔒 Security & Best Practices
+
+### DO ✅
+
+1. **Always send Authorization header** with valid access token
+2. **Validate user input** before API calls (file types, sizes, formats)
+3. **Handle token refresh** automatically on 401 errors
+4. **Store tokens securely** (httpOnly cookies preferred, or sessionStorage)
+5. **Clear tokens on logout**
+6. **Validate file extensions** before upload
+7. **Show upload progress** for large files
+8. **Implement error boundaries** to catch React errors
+9. **Use TypeScript** for type safety
+10. **Test with different roles** (user, admin, auditor)
+11. **Handle slow networks** gracefully
+12. **Show loading states** for all async operations
+13. **Implement proper pagination** for large lists
+14. **Use environment variables** for API URLs
+15. **Log errors** for debugging (but not sensitive data)
+
+### DON'T ❌
+
+1. **Don't send passwords in plain text** - always use HTTPS
+2. **Don't store sensitive data in localStorage** - tokens only
+3. **Don't cache validation results** - always fetch fresh data
+4. **Don't skip file validation** - validate before upload
+5. **Don't assume upload success** - always check response
+6. **Don't show backend errors directly** - translate to user-friendly messages
+7. **Don't hardcode API URLs** - use environment variables
+8. **Don't ignore 429 errors** - implement rate limiting
+9. **Don't skip error handling** - handle all error cases
+10. **Don't bypass role checks** - respect user permissions
+11. **Don't log tokens to console** - security risk
+12. **Don't allow unlimited file sizes** - enforce client-side limits
+13. **Don't trust user input** - always sanitize and validate
+14. **Don't skip loading states** - users need feedback
+
+---
+
+## 📞 Backend Team Contact Points
+
+### When to Contact Backend Team:
+
+1. **API returns unexpected field** - Not documented here
+2. **Need new validation metric** - Custom fairness metric, etc.
+3. **Need new API endpoint** - Bulk operations, advanced filters
+4. **Performance issues** - Slow uploads, timeouts
+5. **Model loading errors** - Unsupported format
+6. **Dataset parsing errors** - CSV issues
+7. **Validation failures** - Unexpected errors
+8. **WebSocket for progress** - Real-time updates
+9. **New model framework support** - XGBoost, LightGBM, etc.
+
+### What NOT to Ask:
+
+❌ "Can I skip authentication?" - No, authentication is required  
+❌ "Can I modify validation results?" - No, results are read-only  
+❌ "Can I upload models > 500 MB?" - No, size limits are enforced  
+❌ "Can I access database directly?" - No, use API only  
+❌ "Can I cache validation results?" - No, always fetch fresh data  
+
+---
+
+## 📝 Document Change Log
+
+| Version | Date | Changes |
+|---------|------|---------|
+| 1.0.0 | Feb 5, 2026 | Initial documentation |
+| | | - Four ethical principles defined |
+| | | - Authentication endpoints documented |
+| | | - Model/dataset upload endpoints specified |
+| | | - Validation workflow described |
+| | | - Results structure defined |
+
+---
+
+## 🔒 Final Reminders
+
+### DO ✅
+
+1. **Integrate authentication** before making any API calls
+2. **Validate files client-side** before upload
+3. **Handle all error responses** documented here
+4. **Show upload progress** for large files
+5. **Poll for validation status** when RUNNING
+6. **Display results clearly** with charts and metrics
+7. **Test with different roles** (user, admin, auditor)
+8. **Implement responsive design**
+9. **Add loading states** for all async operations
+10. **Use TypeScript** for type safety
+
+### DON'T ❌
+
+1. **Don't skip authentication** - required for all endpoints
+2. **Don't cache validation results** - always fetch fresh
+3. **Don't assume file formats** - validate extensions
+4. **Don't ignore errors** - handle all error codes
+5. **Don't hardcode URLs** - use environment variables
+6. **Don't show raw backend errors** - translate to user-friendly messages
+7. **Don't skip role checks** - respect permissions
+8. **Don't log sensitive data** - security risk
+9. **Don't upload without validation** - check files first
+10. **Don't forget loading states** - users need feedback
+
+---
+
+**END OF DOCUMENT**
+
+*This document is maintained by the Backend Team.  
+For questions or clarifications, please contact the Backend Lead.*
+
+**Last Reviewed:** February 5, 2026  
+**Next Review:** When new features are added
+
+---
+
+## 📞 Need Help?
+
+### Quick Links
+- **Authentication Guide:** See section [Authentication & Authorization](#authentication--authorization)
+- **Model Upload Guide:** See section [Supported Model Formats](#supported-model-formats)
+- **Dataset Guide:** See section [Dataset Requirements](#dataset-requirements)
+- **Error Handling:** See section [Error Handling](#error-handling)
+
+### Contact Points
+- **Authentication Issues:** Backend Lead
+- **Upload Problems:** Backend Team
+- **Validation Errors:** Backend Team
+- **Performance Issues:** DevOps Team
+- **Bug Reports:** GitHub Issues
