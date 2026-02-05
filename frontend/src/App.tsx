@@ -1,11 +1,9 @@
 // Main App component with routing
 
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { ThemeProvider } from '@mui/material/styles';
-import { CssBaseline, CircularProgress, Box } from '@mui/material';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Loader2 } from 'lucide-react';
 
-import { theme } from './theme';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 // Pages
@@ -39,16 +37,9 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   if (isLoading) {
     return (
-      <Box
-        sx={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          minHeight: '100vh',
-        }}
-      >
-        <CircularProgress />
-      </Box>
+      <div className="flex justify-center items-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
     );
   }
 
@@ -65,16 +56,9 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 
   if (isLoading) {
     return (
-      <Box
-        sx={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          minHeight: '100vh',
-        }}
-      >
-        <CircularProgress />
-      </Box>
+      <div className="flex justify-center items-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
     );
   }
 
@@ -88,32 +72,17 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 // Placeholder pages for routes not yet implemented
 function PlaceholderPage({ title }: { title: string }) {
   return (
-    <Box
-      sx={{
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'center',
-        alignItems: 'center',
-        minHeight: 'calc(100vh - 64px)',
-        p: 4,
-      }}
-    >
-      <Box
-        sx={{
-          fontSize: '4rem',
-          mb: 2,
-          opacity: 0.5,
-        }}
-      >
+    <div className="flex flex-col justify-center items-center min-h-[calc(100vh-64px)] p-8">
+      <div className="text-6xl mb-4 opacity-50">
         🚧
-      </Box>
-      <Box sx={{ fontSize: '1.5rem', fontWeight: 600, mb: 1 }}>
+      </div>
+      <div className="text-2xl font-semibold mb-2">
         {title}
-      </Box>
-      <Box sx={{ color: 'text.secondary' }}>
+      </div>
+      <div className="text-muted-foreground">
         This page is coming soon
-      </Box>
-    </Box>
+      </div>
+    </div>
   );
 }
 
@@ -160,14 +129,11 @@ function AppRoutes() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
-        <BrowserRouter>
-          <AuthProvider>
-            <AppRoutes />
-          </AuthProvider>
-        </BrowserRouter>
-      </ThemeProvider>
+      <BrowserRouter>
+        <AuthProvider>
+          <AppRoutes />
+        </AuthProvider>
+      </BrowserRouter>
     </QueryClientProvider>
   );
 }

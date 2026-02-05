@@ -1,41 +1,40 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
-    Box,
-    Container,
-    Typography,
-    Button,
-    Card,
-    CardContent,
-    FormControl,
-    InputLabel,
-    Select,
-    MenuItem,
-    Alert,
-    CircularProgress,
-    Chip,
-    IconButton,
-    LinearProgress,
-    Paper,
-    Dialog,
-    DialogTitle,
-    DialogContent,
-    DialogContentText,
-    DialogActions,
-} from '@mui/material';
-import {
-    ArrowBack as BackIcon,
-    Balance as FairnessIcon,
-    Visibility as TransparencyIcon,
+    ArrowLeft as BackIcon,
+    Scale as FairnessIcon,
+    Eye as TransparencyIcon,
     Lock as PrivacyIcon,
-    Assignment as AccountabilityIcon,
+    ClipboardList as AccountabilityIcon,
     CheckCircle as CheckIcon,
-    Cancel as FailIcon,
-    PlayArrow as RunIcon,
-    Refresh as RefreshIcon,
-} from '@mui/icons-material';
+    XCircle as FailIcon,
+    Play as RunIcon,
+    RefreshCw as RefreshIcon,
+} from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { modelsApi, datasetsApi, validationApi } from '../services/api';
+import { Button } from '../components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '../components/ui/select';
+import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert';
+import { Progress } from '../components/ui/progress';
+import { Badge } from '../components/ui/badge';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '../components/ui/dialog';
+import { Label } from '../components/ui/label';
+import { Loader2 } from 'lucide-react';
 
 export default function ValidationPage() {
     const { id } = useParams<{ id: string }>();
@@ -207,556 +206,590 @@ export default function ValidationPage() {
             {/* Warning Dialog for Missing Target Column */}
             <Dialog
                 open={showWarningDialog}
-                onClose={() => {
-                    setShowWarningDialog(false);
-                    setPendingSubmit(false);
+                onOpenChange={(open:boolean) => {
+                    setShowWarningDialog(open);
+                    if (!open) setPendingSubmit(false);
                 }}
-                maxWidth="sm"
-                fullWidth
             >
-                <DialogTitle sx={{ bgcolor: 'warning.main', color: 'warning.contrastText' }}>
-                    ⚠️ Warning: No Target Column Specified
-                </DialogTitle>
-                <DialogContent sx={{ mt: 2 }}>
-                    <DialogContentText>
-                        You have not specified a target column (ground truth). The validation will proceed using <strong>model predictions as the ground truth</strong>.
-                    </DialogContentText>
-                    <DialogContentText sx={{ mt: 2, fontWeight: 600 }}>
-                        This means:
-                    </DialogContentText>
-                    <Box component="ul" sx={{ mt: 1, pl: 2 }}>
-                        <Box component="li" sx={{ mb: 1 }}>
-                            <DialogContentText>
-                                The fairness analysis will check if the model's predictions are <strong>internally consistent</strong> across groups
-                            </DialogContentText>
-                        </Box>
-                        <Box component="li" sx={{ mb: 1 }}>
-                            <DialogContentText>
-                                It will NOT compare predictions to actual outcomes
-                            </DialogContentText>
-                        </Box>
-                        <Box component="li" sx={{ mb: 1 }}>
-                            <DialogContentText>
-                                Results may be <strong>inaccurate or misleading</strong> without ground truth
-                            </DialogContentText>
-                        </Box>
-                    </Box>
-                    <DialogContentText sx={{ mt: 2, color: 'error.main', fontWeight: 600 }}>
-                        Are you sure you want to proceed without providing the target column?
-                    </DialogContentText>
+                <DialogContent className="sm:max-w-[525px]">
+                    <DialogHeader>
+                        <DialogTitle className="text-yellow-600">
+                            ⚠️ Warning: No Target Column Specified
+                        </DialogTitle>
+                        <DialogDescription className="space-y-4 pt-4">
+                            <p>
+                                You have not specified a target column (ground truth). The validation will proceed using <strong>model predictions as the ground truth</strong>.
+                            </p>
+                            <div>
+                                <p className="font-semibold mb-2">This means:</p>
+                                <ul className="list-disc pl-5 space-y-2">
+                                    <li>
+                                        The fairness analysis will check if the model's predictions are <strong>internally consistent</strong> across groups
+                                    </li>
+                                    <li>
+                                        It will NOT compare predictions to actual outcomes
+                                    </li>
+                                    <li>
+                                        Results may be <strong>inaccurate or misleading</strong> without ground truth
+                                    </li>
+                                </ul>
+                            </div>
+                            <p className="text-red-600 font-semibold">
+                                Are you sure you want to proceed without providing the target column?
+                            </p>
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="gap-2 sm:gap-0">
+                        <Button
+                            variant="outline"
+                            onClick={() => {
+                                setShowWarningDialog(false);
+                                setPendingSubmit(false);
+                            }}
+                        >
+                            Cancel - Add Target Column
+                        </Button>
+                        <Button
+                            variant="default"
+                            className="bg-yellow-600 hover:bg-yellow-700"
+                            onClick={() => {
+                                setShowWarningDialog(false);
+                                setPendingSubmit(false);
+                                handleRunAllValidations();
+                            }}
+                        >
+                            Proceed Without Target
+                        </Button>
+                    </DialogFooter>
                 </DialogContent>
-                <DialogActions sx={{ p: 2 }}>
-                    <Button
-                        onClick={() => {
-                            setShowWarningDialog(false);
-                            setPendingSubmit(false);
-                        }}
-                        variant="outlined"
-                    >
-                        Cancel - Add Target Column
-                    </Button>
-                    <Button
-                        onClick={() => {
-                            setShowWarningDialog(false);
-                            setPendingSubmit(false);
-                            handleRunAllValidations();
-                        }}
-                        variant="contained"
-                        color="warning"
-                    >
-                        Proceed Without Target
-                    </Button>
-                </DialogActions>
             </Dialog>
 
-            <Container maxWidth="lg" sx={{ py: 4 }}>
+            <div className="container max-w-7xl mx-auto py-8 px-4">
                 {/* Header */}
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 4 }}>
-                    <IconButton onClick={() => navigate(`/projects/${id}`)} sx={{ mr: 2 }}>
-                        <BackIcon />
-                    </IconButton>
-                    <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                <div className="flex items-center mb-8">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => navigate(`/projects/${id}`)}
+                        className="mr-4"
+                    >
+                        <BackIcon className="h-5 w-5" />
+                    </Button>
+                    <h1 className="text-4xl font-bold">
                         Ethical AI Validation Suite
-                    </Typography>
-                </Box>
+                    </h1>
+                </div>
 
                 {error && (
-                    <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError('')}>
-                        {error}
+                    <Alert variant="destructive" className="mb-6">
+                        <AlertTitle>Error</AlertTitle>
+                        <AlertDescription>{error}</AlertDescription>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="absolute top-2 right-2"
+                            onClick={() => setError('')}
+                        >
+                            ×
+                        </Button>
                     </Alert>
                 )}
 
                 {/* Configuration Form */}
                 {!isRunning && !results && (
-                    <Card sx={{ mb: 3 }}>
-                        <CardContent sx={{ p: 4 }}>
-                            <Typography variant="h6" gutterBottom>
+                    <Card className="mb-6">
+                        <CardContent className="p-8">
+                            <h2 className="text-xl font-semibold mb-2">
                                 Configure Validation Suite
-                            </Typography>
-                            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                            </h2>
+                            <p className="text-sm text-muted-foreground mb-6">
                                 This will run all 4 ethical validations: Fairness, Transparency, Privacy, and Accountability
-                            </Typography>
+                            </p>
 
-                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                            <div className="space-y-6">
                                 {/* Row 1 */}
-                                <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     {/* Model Selection */}
-                                    <Box sx={{ flex: '1 1 45%', minWidth: 250 }}>
-                                        <FormControl fullWidth>
-                                            <InputLabel>Model</InputLabel>
-                                            <Select
-                                                value={selectedModel}
-                                                label="Model"
-                                                onChange={(e) => setSelectedModel(e.target.value)}
-                                            >
+                                    <div className="space-y-2">
+                                        <Label htmlFor="model-select">Model</Label>
+                                        <Select value={selectedModel} onValueChange={setSelectedModel}>
+                                            <SelectTrigger id="model-select">
+                                                <SelectValue placeholder="Select a model" />
+                                            </SelectTrigger>
+                                            <SelectContent>
                                                 {models?.map((model: any) => (
-                                                    <MenuItem key={model.id} value={model.id}>
+                                                    <SelectItem key={model.id} value={model.id}>
                                                         {model.name} ({model.model_type})
-                                                    </MenuItem>
+                                                    </SelectItem>
                                                 ))}
-                                            </Select>
-                                        </FormControl>
-                                    </Box>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
 
                                     {/* Dataset Selection */}
-                                    <Box sx={{ flex: '1 1 45%', minWidth: 250 }}>
-                                        <FormControl fullWidth>
-                                            <InputLabel>Dataset</InputLabel>
-                                            <Select
-                                                value={selectedDataset}
-                                                label="Dataset"
-                                                onChange={(e) => setSelectedDataset(e.target.value)}
-                                            >
+                                    <div className="space-y-2">
+                                        <Label htmlFor="dataset-select">Dataset</Label>
+                                        <Select value={selectedDataset} onValueChange={setSelectedDataset}>
+                                            <SelectTrigger id="dataset-select">
+                                                <SelectValue placeholder="Select a dataset" />
+                                            </SelectTrigger>
+                                            <SelectContent>
                                                 {datasets?.map((dataset: any) => (
-                                                    <MenuItem key={dataset.id} value={dataset.id}>
+                                                    <SelectItem key={dataset.id} value={dataset.id}>
                                                         {dataset.name} ({dataset.row_count} rows)
-                                                    </MenuItem>
+                                                    </SelectItem>
                                                 ))}
-                                            </Select>
-                                        </FormControl>
-                                    </Box>
-                                </Box>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                </div>
 
                                 {/* Row 2 */}
-                                <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     {/* Sensitive Feature */}
-                                    <Box sx={{ flex: '1 1 45%', minWidth: 250 }}>
-                                        <FormControl fullWidth>
-                                            <InputLabel>Sensitive Feature (for Fairness)</InputLabel>
-                                            <Select
-                                                value={sensitiveFeature}
-                                                label="Sensitive Feature (for Fairness)"
-                                                onChange={(e) => setSensitiveFeature(e.target.value)}
-                                                disabled={!selectedDataset}
-                                            >
+                                    <div className="space-y-2">
+                                        <Label htmlFor="sensitive-feature">Sensitive Feature (for Fairness)</Label>
+                                        <Select
+                                            value={sensitiveFeature}
+                                            onValueChange={setSensitiveFeature}
+                                            disabled={!selectedDataset}
+                                        >
+                                            <SelectTrigger id="sensitive-feature">
+                                                <SelectValue placeholder="Select sensitive feature" />
+                                            </SelectTrigger>
+                                            <SelectContent>
                                                 {selectedDatasetObj?.columns?.map((col: string) => (
-                                                    <MenuItem key={col} value={col}>{col}</MenuItem>
+                                                    <SelectItem key={col} value={col}>
+                                                        {col}
+                                                    </SelectItem>
                                                 ))}
-                                            </Select>
-                                        </FormControl>
-                                    </Box>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
 
                                     {/* Target Column */}
-                                    <Box sx={{ flex: '1 1 45%', minWidth: 250 }}>
-                                        <FormControl fullWidth>
-                                            <InputLabel>Target Column (Optional)</InputLabel>
-                                            <Select
-                                                value={targetColumn}
-                                                label="Target Column (Optional)"
-                                                onChange={(e) => setTargetColumn(e.target.value)}
-                                                disabled={!selectedDataset}
-                                            >
-                                                <MenuItem value="">
-                                                    <em>None - Use model predictions</em>
-                                                </MenuItem>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="target-column">Target Column (Optional)</Label>
+                                        <Select
+                                            value={targetColumn}
+                                            onValueChange={setTargetColumn}
+                                            disabled={!selectedDataset}
+                                        >
+                                            <SelectTrigger id="target-column">
+                                                <SelectValue placeholder="None - Use model predictions" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="">
+                                                    None - Use model predictions
+                                                </SelectItem>
                                                 {selectedDatasetObj?.columns?.map((col: string) => (
-                                                    <MenuItem key={col} value={col}>{col}</MenuItem>
+                                                    <SelectItem key={col} value={col}>
+                                                        {col}
+                                                    </SelectItem>
                                                 ))}
-                                            </Select>
-                                            {!targetColumn && (
-                                                <Typography variant="caption" color="warning.main" sx={{ mt: 0.5, ml: 1 }}>
-                                                    ⚠️ Without target column, fairness will be checked using model predictions
-                                                </Typography>
-                                            )}
-                                        </FormControl>
-                                    </Box>
-                                </Box>
+                                            </SelectContent>
+                                        </Select>
+                                        {!targetColumn && (
+                                            <p className="text-xs text-yellow-600 mt-1 ml-1">
+                                                ⚠️ Without target column, fairness will be checked using model predictions
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
 
                                 {/* Row 3 */}
-                                <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     {/* Quasi Identifiers */}
-                                    <Box sx={{ flex: '1 1 45%', minWidth: 250 }}>
-                                        <FormControl fullWidth>
-                                            <InputLabel>Quasi-Identifiers (Optional, for Privacy)</InputLabel>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="quasi-identifiers">Quasi-Identifiers (Optional, for Privacy)</Label>
+                                        <div className="space-y-2">
                                             <Select
-                                                multiple
-                                                value={quasiIdentifiers}
-                                                label="Quasi-Identifiers (Optional, for Privacy)"
-                                                onChange={(e) => setQuasiIdentifiers(e.target.value as string[])}
+                                                value=""
+                                                onValueChange={(value: string) => {
+                                                    if (value && !quasiIdentifiers.includes(value)) {
+                                                        setQuasiIdentifiers([...quasiIdentifiers, value]);
+                                                    }
+                                                }}
                                                 disabled={!selectedDataset}
-                                                renderValue={(selected) => (
-                                                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                                                        {selected.map((value) => (
-                                                            <Chip key={value} label={value} size="small" />
-                                                        ))}
-                                                    </Box>
-                                                )}
                                             >
-                                                {selectedDatasetObj?.columns?.map((col: string) => (
-                                                    <MenuItem key={col} value={col}>{col}</MenuItem>
-                                                ))}
+                                                <SelectTrigger id="quasi-identifiers">
+                                                    <SelectValue placeholder="Select quasi-identifiers" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {selectedDatasetObj?.columns?.map((col: string) => (
+                                                        <SelectItem 
+                                                            key={col} 
+                                                            value={col}
+                                                            disabled={quasiIdentifiers.includes(col)}
+                                                        >
+                                                            {col} {quasiIdentifiers.includes(col) && '✓'}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
                                             </Select>
-                                        </FormControl>
-                                    </Box>
+                                            {quasiIdentifiers.length > 0 && (
+                                                <div className="flex flex-wrap gap-1">
+                                                    {quasiIdentifiers.map((value) => (
+                                                        <Badge 
+                                                            key={value} 
+                                                            variant="secondary" 
+                                                            className="text-xs cursor-pointer"
+                                                            onClick={() => {
+                                                                setQuasiIdentifiers(quasiIdentifiers.filter(id => id !== value));
+                                                            }}
+                                                        >
+                                                            {value} ×
+                                                        </Badge>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
 
                                     {/* Sensitive Attribute */}
-                                    <Box sx={{ flex: '1 1 45%', minWidth: 250 }}>
-                                        <FormControl fullWidth>
-                                            <InputLabel>Sensitive Attribute (Optional, for Privacy)</InputLabel>
-                                            <Select
-                                                value={sensitiveAttribute}
-                                                label="Sensitive Attribute (Optional, for Privacy)"
-                                                onChange={(e) => setSensitiveAttribute(e.target.value)}
-                                                disabled={!selectedDataset}
-                                            >
-                                                <MenuItem value="">None</MenuItem>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="sensitive-attribute">Sensitive Attribute (Optional, for Privacy)</Label>
+                                        <Select
+                                            value={sensitiveAttribute}
+                                            onValueChange={setSensitiveAttribute}
+                                            disabled={!selectedDataset}
+                                        >
+                                            <SelectTrigger id="sensitive-attribute">
+                                                <SelectValue placeholder="None" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="">None</SelectItem>
                                                 {selectedDatasetObj?.columns?.map((col: string) => (
-                                                    <MenuItem key={col} value={col}>{col}</MenuItem>
+                                                    <SelectItem key={col} value={col}>
+                                                        {col}
+                                                    </SelectItem>
                                                 ))}
-                                            </Select>
-                                        </FormControl>
-                                    </Box>
-                                </Box>
-                            </Box>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                </div>
+                            </div>
 
-                            <Box sx={{ mt: 4, display: 'flex', justifyContent: 'flex-end' }}>
+                            <div className="mt-8 flex justify-end">
                                 <Button
-                                    variant="contained"
-                                    size="large"
-                                    startIcon={<RunIcon />}
+                                    size="lg"
                                     onClick={handleRunAllValidations}
                                     disabled={!selectedModel || !selectedDataset || !sensitiveFeature}
                                 >
+                                    <RunIcon className="mr-2 h-4 w-4" />
                                     Run All Validations
                                 </Button>
-                            </Box>
+                            </div>
                         </CardContent>
                     </Card>
                 )}
 
                 {/* Progress Indicator */}
                 {isRunning && (
-                    <Paper sx={{ p: 4, mb: 3 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                            <CircularProgress size={24} sx={{ mr: 2 }} />
-                            <Typography variant="h6">Running Validations...</Typography>
-                        </Box>
-                        <LinearProgress variant="determinate" value={progress} sx={{ mb: 2, height: 8, borderRadius: 1 }} />
-                        <Typography variant="body2" color="text.secondary">
-                            {currentStep} ({progress}%)
-                        </Typography>
-                    </Paper>
+                    <Card className="mb-6">
+                        <CardContent className="p-8">
+                            <div className="flex items-center mb-4">
+                                <Loader2 className="mr-4 h-6 w-6 animate-spin" />
+                                <h2 className="text-xl font-semibold">Running Validations...</h2>
+                            </div>
+                            <Progress value={progress} className="mb-4 h-2" />
+                            <p className="text-sm text-muted-foreground">
+                                {currentStep} ({progress}%)
+                            </p>
+                        </CardContent>
+                    </Card>
                 )}
 
                 {/* Results */}
                 {results && (
-                    <Box>
-                        <Alert
-                            severity={results.overall_passed ? 'success' : 'warning'}
-                            sx={{ mb: 3 }}
-                            icon={results.overall_passed ? <CheckIcon /> : <FailIcon />}
-                        >
-                            <Typography variant="h6">
+                    <div>
+                        <Alert className={`mb-6 ${results.overall_passed ? 'border-green-500 bg-green-50' : 'border-yellow-500 bg-yellow-50'}`}>
+                            {results.overall_passed ? (
+                                <CheckIcon className="h-5 w-5 text-green-600" />
+                            ) : (
+                                <FailIcon className="h-5 w-5 text-yellow-600" />
+                            )}
+                            <AlertTitle className="text-lg">
                                 Validation Suite {results.overall_passed ? 'Passed' : 'Failed'}
-                            </Typography>
-                            <Typography variant="body2">
+                            </AlertTitle>
+                            <AlertDescription>
                                 Suite ID: {results.suite_id}
-                            </Typography>
+                            </AlertDescription>
                         </Alert>
 
-                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             {results.validations?.fairness && (
-                                <Box sx={{ flex: '1 1 45%', minWidth: 300 }}>
-                                    <Card>
-                                        <CardContent>
-                                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                                                <FairnessIcon sx={{ fontSize: 32, color: '#4caf50', mr: 2 }} />
-                                                <Box sx={{ flex: 1 }}>
-                                                    <Typography variant="h6">Fairness Validation</Typography>
-                                                    <Chip
-                                                        label={results.validations.fairness.status}
-                                                        color={results.validations.fairness.status === 'completed' ? 'success' : 'default'}
-                                                        size="small"
-                                                    />
-                                                </Box>
-                                            </Box>
-                                            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                                                Progress: {results.validations.fairness.progress}%
-                                            </Typography>
+                                <Card>
+                                    <CardContent className="p-6">
+                                        <div className="flex items-center mb-4">
+                                            <FairnessIcon className="h-8 w-8 text-green-600 mr-4" />
+                                            <div className="flex-1">
+                                                <h3 className="text-lg font-semibold">Fairness Validation</h3>
+                                                <Badge
+                                                    variant={results.validations.fairness.status === 'completed' ? 'default' : 'secondary'}
+                                                    className="mt-1"
+                                                >
+                                                    {results.validations.fairness.status}
+                                                </Badge>
+                                            </div>
+                                        </div>
+                                        <p className="text-sm text-muted-foreground mb-4">
+                                            Progress: {results.validations.fairness.progress}%
+                                        </p>
 
-                                            {/* Display detailed metrics if available */}
-                                            {results.validations.fairness.results && results.validations.fairness.results.length > 0 && (
-                                                <Box sx={{ mt: 2 }}>
-                                                    <Typography variant="subtitle2" sx={{ mb: 1 }}>Metrics:</Typography>
-                                                    {results.validations.fairness.results.map((metric: any, idx: number) => (
-                                                        <Box key={idx} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                                                            <Typography variant="body2" sx={{ fontSize: '0.85rem' }}>
-                                                                {metric.metric_name.replace(/_/g, ' ')}
-                                                            </Typography>
-                                                            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                                                                <Typography variant="caption" color="text.secondary">
-                                                                    {metric.metric_value?.toFixed(3)} / {metric.threshold}
-                                                                </Typography>
-                                                                <Chip
-                                                                    label={metric.passed ? '✓' : '✗'}
-                                                                    color={metric.passed ? 'success' : 'error'}
-                                                                    size="small"
-                                                                    sx={{ minWidth: 30, height: 20 }}
-                                                                />
-                                                            </Box>
-                                                        </Box>
-                                                    ))}
-                                                </Box>
-                                            )}
+                                        {/* Display detailed metrics if available */}
+                                        {results.validations.fairness.results && results.validations.fairness.results.length > 0 && (
+                                            <div className="mt-4">
+                                                <p className="text-sm font-semibold mb-2">Metrics:</p>
+                                                {results.validations.fairness.results.map((metric: any, idx: number) => (
+                                                    <div key={idx} className="flex justify-between items-center mb-2">
+                                                        <span className="text-xs">
+                                                            {metric.metric_name.replace(/_/g, ' ')}
+                                                        </span>
+                                                        <div className="flex gap-2 items-center">
+                                                            <span className="text-xs text-muted-foreground">
+                                                                {metric.metric_value?.toFixed(3)} / {metric.threshold}
+                                                            </span>
+                                                            <Badge
+                                                                variant={metric.passed ? 'default' : 'destructive'}
+                                                                className="min-w-[30px] h-5 text-xs"
+                                                            >
+                                                                {metric.passed ? '✓' : '✗'}
+                                                            </Badge>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
 
-                                            {results.validations.fairness.mlflow_run_id && (
-                                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 2 }}>
-                                                    MLflow Run: {results.validations.fairness.mlflow_run_id.substring(0, 8)}...
-                                                </Typography>
-                                            )}
-                                        </CardContent>
-                                    </Card>
-                                </Box>
+                                        {results.validations.fairness.mlflow_run_id && (
+                                            <p className="text-xs text-muted-foreground mt-4">
+                                                MLflow Run: {results.validations.fairness.mlflow_run_id.substring(0, 8)}...
+                                            </p>
+                                        )}
+                                    </CardContent>
+                                </Card>
                             )}
 
                             {results.validations?.transparency && (
-                                <Box sx={{ flex: '1 1 45%', minWidth: 300 }}>
-                                    <Card>
-                                        <CardContent>
-                                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                                                <TransparencyIcon sx={{ fontSize: 32, color: '#2196f3', mr: 2 }} />
-                                                <Box sx={{ flex: 1 }}>
-                                                    <Typography variant="h6">Transparency Validation</Typography>
-                                                    <Chip
-                                                        label={results.validations.transparency.status}
-                                                        color={results.validations.transparency.status === 'completed' ? 'success' : 'default'}
-                                                        size="small"
-                                                    />
-                                                </Box>
-                                            </Box>
-                                            
-                                            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                                                Progress: 100%
-                                            </Typography>
+                                <Card>
+                                    <CardContent className="p-6">
+                                        <div className="flex items-center mb-4">
+                                            <TransparencyIcon className="h-8 w-8 text-blue-600 mr-4" />
+                                            <div className="flex-1">
+                                                <h3 className="text-lg font-semibold">Transparency Validation</h3>
+                                                <Badge
+                                                    variant={results.validations.transparency.status === 'completed' ? 'default' : 'secondary'}
+                                                    className="mt-1"
+                                                >
+                                                    {results.validations.transparency.status}
+                                                </Badge>
+                                            </div>
+                                        </div>
+                                        
+                                        <p className="text-sm text-muted-foreground mb-2">
+                                            Progress: 100%
+                                        </p>
 
-                                            {/* Feature Importance */}
-                                            {results.validations.transparency.global_importance && (
-                                                <Box sx={{ mt: 2 }}>
-                                                    <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>
-                                                        Top Feature Importances:
-                                                    </Typography>
-                                                    {Object.entries(results.validations.transparency.global_importance)
-                                                        .sort(([, a]: any, [, b]: any) => b - a)
-                                                        .slice(0, 5)
-                                                        .map(([feature, importance]: any) => (
-                                                            <Box key={feature} sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                                                                <Typography variant="caption">{feature}:</Typography>
-                                                                <Typography variant="caption" sx={{ fontWeight: 'bold' }}>
-                                                                    {(importance * 100).toFixed(2)}%
-                                                                </Typography>
-                                                            </Box>
-                                                        ))}
-                                                </Box>
-                                            )}
+                                        {/* Feature Importance */}
+                                        {results.validations.transparency.global_importance && (
+                                            <div className="mt-4">
+                                                <p className="text-sm font-bold mb-2">
+                                                    Top Feature Importances:
+                                                </p>
+                                                {Object.entries(results.validations.transparency.global_importance)
+                                                    .sort(([, a]: any, [, b]: any) => b - a)
+                                                    .slice(0, 5)
+                                                    .map(([feature, importance]: any) => (
+                                                        <div key={feature} className="flex justify-between mb-1">
+                                                            <span className="text-xs">{feature}:</span>
+                                                            <span className="text-xs font-bold">
+                                                                {(importance * 100).toFixed(2)}%
+                                                            </span>
+                                                        </div>
+                                                    ))}
+                                            </div>
+                                        )}
 
-                                            {/* Model Card Metrics */}
-                                            {results.validations.transparency.model_card?.performance_metrics && (
-                                                <Box sx={{ mt: 2 }}>
-                                                    <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>
-                                                        Model Performance:
-                                                    </Typography>
-                                                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                                                        {Object.entries(results.validations.transparency.model_card.performance_metrics).map(([metric, value]: any) => (
-                                                            <Chip
-                                                                key={metric}
-                                                                label={`${metric}: ${(value * 100).toFixed(1)}%`}
-                                                                size="small"
-                                                                variant="outlined"
-                                                            />
-                                                        ))}
-                                                    </Box>
-                                                </Box>
-                                            )}
+                                        {/* Model Card Metrics */}
+                                        {results.validations.transparency.model_card?.performance_metrics && (
+                                            <div className="mt-4">
+                                                <p className="text-sm font-bold mb-2">
+                                                    Model Performance:
+                                                </p>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {Object.entries(results.validations.transparency.model_card.performance_metrics).map(([metric, value]: any) => (
+                                                        <Badge
+                                                            key={metric}
+                                                            variant="outline"
+                                                        >
+                                                            {metric}: {(value * 100).toFixed(1)}%
+                                                        </Badge>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
 
-                                            {results.validations.transparency.mlflow_run_id && (
-                                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 2 }}>
-                                                    MLflow Run: {results.validations.transparency.mlflow_run_id.substring(0, 8)}...
-                                                </Typography>
-                                            )}
+                                        {results.validations.transparency.mlflow_run_id && (
+                                            <p className="text-xs text-muted-foreground mt-4">
+                                                MLflow Run: {results.validations.transparency.mlflow_run_id.substring(0, 8)}...
+                                            </p>
+                                        )}
 
-                                            <Button
-                                                variant="outlined"
-                                                color="primary"
-                                                fullWidth
-                                                sx={{ mt: 2 }}
-                                                onClick={() => navigate(`/validations/${results.suite_id}/transparency`)}
-                                            >
-                                                View Detailed Transparency Report
-                                            </Button>
-                                        </CardContent>
-                                    </Card>
-                                </Box>
+                                        <Button
+                                            variant="outline"
+                                            className="w-full mt-4"
+                                            onClick={() => navigate(`/validations/${results.suite_id}/transparency`)}
+                                        >
+                                            View Detailed Transparency Report
+                                        </Button>
+                                    </CardContent>
+                                </Card>
                             )}
 
                             {results.validations?.privacy && (
-                                <Box sx={{ flex: '1 1 45%', minWidth: 300 }}>
-                                    <Card>
-                                        <CardContent>
-                                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                                                <PrivacyIcon sx={{ fontSize: 32, color: '#ff9800', mr: 2 }} />
-                                                <Box sx={{ flex: 1 }}>
-                                                    <Typography variant="h6">Privacy Validation</Typography>
-                                                    <Chip
-                                                        label={results.validations.privacy.status}
-                                                        color={results.validations.privacy.status === 'completed' ? 'success' : 'default'}
-                                                        size="small"
-                                                    />
-                                                </Box>
-                                            </Box>
-                                            
-                                            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                                                Progress: 100%
-                                            </Typography>
+                                <Card>
+                                    <CardContent className="p-6">
+                                        <div className="flex items-center mb-4">
+                                            <PrivacyIcon className="h-8 w-8 text-orange-600 mr-4" />
+                                            <div className="flex-1">
+                                                <h3 className="text-lg font-semibold">Privacy Validation</h3>
+                                                <Badge
+                                                    variant={results.validations.privacy.status === 'completed' ? 'default' : 'secondary'}
+                                                    className="mt-1"
+                                                >
+                                                    {results.validations.privacy.status}
+                                                </Badge>
+                                            </div>
+                                        </div>
+                                        
+                                        <p className="text-sm text-muted-foreground mb-2">
+                                            Progress: 100%
+                                        </p>
 
-                                            {/* PII Detection */}
-                                            {results.validations.privacy.pii_detected && (
-                                                <Box sx={{ mt: 2 }}>
-                                                    <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>
-                                                        PII Detection:
-                                                    </Typography>
-                                                    <Typography variant="body2" color={results.validations.privacy.pii_detected.length > 0 ? 'error' : 'success'}>
-                                                        {results.validations.privacy.pii_detected.length > 0 
-                                                            ? `⚠️ ${results.validations.privacy.pii_detected.length} column(s) with PII detected`
-                                                            : '✓ No PII detected'}
-                                                    </Typography>
-                                                    {results.validations.privacy.pii_detected.length > 0 && (
-                                                        <Box sx={{ mt: 1, pl: 2 }}>
-                                                            {results.validations.privacy.pii_detected.map((pii: any, idx: number) => (
-                                                                <Typography key={idx} variant="caption" sx={{ display: 'block' }}>
-                                                                    • {pii.column_name}: {pii.pii_type} ({(pii.confidence * 100).toFixed(0)}%)
-                                                                </Typography>
-                                                            ))}
-                                                        </Box>
-                                                    )}
-                                                </Box>
-                                            )}
+                                        {/* PII Detection */}
+                                        {results.validations.privacy.pii_detected && (
+                                            <div className="mt-4">
+                                                <p className="text-sm font-bold mb-2">
+                                                    PII Detection:
+                                                </p>
+                                                <p className={`text-sm ${results.validations.privacy.pii_detected.length > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                                    {results.validations.privacy.pii_detected.length > 0 
+                                                        ? `⚠️ ${results.validations.privacy.pii_detected.length} column(s) with PII detected`
+                                                        : '✓ No PII detected'}
+                                                </p>
+                                                {results.validations.privacy.pii_detected.length > 0 && (
+                                                    <div className="mt-2 pl-4">
+                                                        {results.validations.privacy.pii_detected.map((pii: any, idx: number) => (
+                                                            <p key={idx} className="text-xs">
+                                                                • {pii.column_name}: {pii.pii_type} ({(pii.confidence * 100).toFixed(0)}%)
+                                                            </p>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
 
-                                            {/* k-Anonymity */}
-                                            {results.validations.privacy.k_anonymity && (
-                                                <Box sx={{ mt: 2 }}>
-                                                    <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>
-                                                        k-Anonymity (k={results.validations.privacy.k_anonymity.k_value}):
-                                                    </Typography>
-                                                    <Chip
-                                                        label={results.validations.privacy.k_anonymity.satisfies_k ? 'PASSED' : 'FAILED'}
-                                                        color={results.validations.privacy.k_anonymity.satisfies_k ? 'success' : 'error'}
-                                                        size="small"
-                                                        sx={{ mb: 1 }}
-                                                    />
-                                                    {!results.validations.privacy.k_anonymity.satisfies_k && (
-                                                        <Typography variant="caption" sx={{ display: 'block' }}>
-                                                            Min group size: {results.validations.privacy.k_anonymity.actual_min_k}<br />
-                                                            Violating groups: {results.validations.privacy.k_anonymity.violating_groups_count}
-                                                        </Typography>
-                                                    )}
-                                                </Box>
-                                            )}
+                                        {/* k-Anonymity */}
+                                        {results.validations.privacy.k_anonymity && (
+                                            <div className="mt-4">
+                                                <p className="text-sm font-bold mb-2">
+                                                    k-Anonymity (k={results.validations.privacy.k_anonymity.k_value}):
+                                                </p>
+                                                <Badge
+                                                    variant={results.validations.privacy.k_anonymity.satisfies_k ? 'default' : 'destructive'}
+                                                    className="mb-2"
+                                                >
+                                                    {results.validations.privacy.k_anonymity.satisfies_k ? 'PASSED' : 'FAILED'}
+                                                </Badge>
+                                                {!results.validations.privacy.k_anonymity.satisfies_k && (
+                                                    <p className="text-xs">
+                                                        Min group size: {results.validations.privacy.k_anonymity.actual_min_k}<br />
+                                                        Violating groups: {results.validations.privacy.k_anonymity.violating_groups_count}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        )}
 
-                                            {/* l-Diversity */}
-                                            {results.validations.privacy.l_diversity && (
-                                                <Box sx={{ mt: 2 }}>
-                                                    <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 'bold' }}>
-                                                        l-Diversity (l={results.validations.privacy.l_diversity.l_value}):
-                                                    </Typography>
-                                                    <Chip
-                                                        label={results.validations.privacy.l_diversity.satisfies_l ? 'PASSED' : 'FAILED'}
-                                                        color={results.validations.privacy.l_diversity.satisfies_l ? 'success' : 'error'}
-                                                        size="small"
-                                                        sx={{ mb: 1 }}
-                                                    />
-                                                    {!results.validations.privacy.l_diversity.satisfies_l && (
-                                                        <Typography variant="caption" sx={{ display: 'block' }}>
-                                                            Sensitive: {results.validations.privacy.l_diversity.sensitive_attribute}<br />
-                                                            Violating groups: {results.validations.privacy.l_diversity.violating_groups_count}
-                                                        </Typography>
-                                                    )}
-                                                </Box>
-                                            )}
+                                        {/* l-Diversity */}
+                                        {results.validations.privacy.l_diversity && (
+                                            <div className="mt-4">
+                                                <p className="text-sm font-bold mb-2">
+                                                    l-Diversity (l={results.validations.privacy.l_diversity.l_value}):
+                                                </p>
+                                                <Badge
+                                                    variant={results.validations.privacy.l_diversity.satisfies_l ? 'default' : 'destructive'}
+                                                    className="mb-2"
+                                                >
+                                                    {results.validations.privacy.l_diversity.satisfies_l ? 'PASSED' : 'FAILED'}
+                                                </Badge>
+                                                {!results.validations.privacy.l_diversity.satisfies_l && (
+                                                    <p className="text-xs">
+                                                        Sensitive: {results.validations.privacy.l_diversity.sensitive_attribute}<br />
+                                                        Violating groups: {results.validations.privacy.l_diversity.violating_groups_count}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        )}
 
-                                            {/* Overall Status */}
-                                            <Box sx={{ mt: 2, p: 1, bgcolor: results.validations.privacy.overall_passed ? 'success.light' : 'error.light', borderRadius: 1 }}>
-                                                <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-                                                    {results.validations.privacy.overall_passed ? '✓ Privacy Validated' : '⚠️ Privacy Issues Found'}
-                                                </Typography>
-                                            </Box>
+                                        {/* Overall Status */}
+                                        <div className={`mt-4 p-3 rounded-md ${results.validations.privacy.overall_passed ? 'bg-green-100' : 'bg-red-100'}`}>
+                                            <p className="text-sm font-bold">
+                                                {results.validations.privacy.overall_passed ? '✓ Privacy Validated' : '⚠️ Privacy Issues Found'}
+                                            </p>
+                                        </div>
 
-                                            {results.validations.privacy.mlflow_run_id && (
-                                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 2 }}>
-                                                    MLflow Run: {results.validations.privacy.mlflow_run_id.substring(0, 8)}...
-                                                </Typography>
-                                            )}
+                                        {results.validations.privacy.mlflow_run_id && (
+                                            <p className="text-xs text-muted-foreground mt-4">
+                                                MLflow Run: {results.validations.privacy.mlflow_run_id.substring(0, 8)}...
+                                            </p>
+                                        )}
 
-                                            <Button
-                                                variant="outlined"
-                                                color="primary"
-                                                fullWidth
-                                                sx={{ mt: 2 }}
-                                                onClick={() => navigate(`/validations/${results.suite_id}/privacy`)}
-                                            >
-                                                View Detailed Privacy Report
-                                            </Button>
-                                        </CardContent>
-                                    </Card>
-                                </Box>
+                                        <Button
+                                            variant="outline"
+                                            className="w-full mt-4"
+                                            onClick={() => navigate(`/validations/${results.suite_id}/privacy`)}
+                                        >
+                                            View Detailed Privacy Report
+                                        </Button>
+                                    </CardContent>
+                                </Card>
                             )}
 
                             {/* Accountability */}
-                            <Box sx={{ flex: '1 1 45%', minWidth: 300 }}>
-                                <Card>
-                                    <CardContent>
-                                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                                            <AccountabilityIcon sx={{ fontSize: 32, color: '#9c27b0', mr: 2 }} />
-                                            <Box sx={{ flex: 1 }}>
-                                                <Typography variant="h6">Accountability Tracking</Typography>
-                                                <Chip
-                                                    label="MLflow Integrated"
-                                                    color="success"
-                                                    size="small"
-                                                />
-                                            </Box>
-                                        </Box>
-                                        <Typography variant="body2" color="text.secondary">
-                                            All validations tracked in MLflow
-                                        </Typography>
-                                        <Typography variant="caption" color="text.secondary">
-                                            View experiment runs in MLflow UI
-                                        </Typography>
-                                    </CardContent>
-                                </Card>
-                            </Box>
-                        </Box>
+                            <Card>
+                                <CardContent className="p-6">
+                                    <div className="flex items-center mb-4">
+                                        <AccountabilityIcon className="h-8 w-8 text-purple-600 mr-4" />
+                                        <div className="flex-1">
+                                            <h3 className="text-lg font-semibold">Accountability Tracking</h3>
+                                            <Badge variant="default" className="mt-1">
+                                                MLflow Integrated
+                                            </Badge>
+                                        </div>
+                                    </div>
+                                    <p className="text-sm text-muted-foreground">
+                                        All validations tracked in MLflow
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                        View experiment runs in MLflow UI
+                                    </p>
+                                </CardContent>
+                            </Card>
+                        </div>
 
-                        <Box sx={{ mt: 3, display: 'flex', gap: 2 }}>
-                            <Button variant="outlined" onClick={() => navigate(`/projects/${id}`)}>
+                        <div className="mt-6 flex gap-4">
+                            <Button variant="outline" onClick={() => navigate(`/projects/${id}`)}>
                                 Back to Project
                             </Button>
-                            <Button variant="contained" startIcon={<RefreshIcon />} onClick={handleReset}>
+                            <Button onClick={handleReset}>
+                                <RefreshIcon className="mr-2 h-4 w-4" />
                                 Run Another Validation
                             </Button>
-                        </Box>
-                    </Box>
+                        </div>
+                    </div>
                 )}
-            </Container>
+            </div>
         </>
     );
 }

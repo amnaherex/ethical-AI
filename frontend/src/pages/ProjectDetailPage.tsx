@@ -1,694 +1,275 @@
-// Project detail page with model/dataset upload
-
-import { useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import {
-    Box,
-    Container,
-    Typography,
-    Button,
-    Card,
-    CardContent,
-    Tabs,
-    Tab,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
-    IconButton,
-    Chip,
-    CircularProgress,
-    Alert,
-    Dialog,
-    DialogTitle,
-    DialogContent,
-    DialogActions,
-    TextField,
-    LinearProgress,
-} from '@mui/material';
-import {
-    ArrowBack as BackIcon,
-    CloudUpload as UploadIcon,
-    Delete as DeleteIcon,
-    PlayArrow as RunIcon,
-    ModelTraining as ModelIcon,
-    Storage as DatasetIcon,
-    Assessment as ValidationIcon,
-} from '@mui/icons-material';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { projectsApi, modelsApi, datasetsApi, validationApi } from '../services/api';
-import BenchmarkDatasetLoader from '../components/BenchmarkDatasetLoader';
+import { 
+    ArrowLeft, 
+    ShieldAlert, 
+    ShieldCheck, 
+    Lock, 
+    AlertTriangle, 
+    CheckCircle2, 
+    Info, 
+    Loader2 
+} from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { validationApi } from '../services/api';
 
-interface TabPanelProps {
-    children?: React.ReactNode;
-    index: number;
-    value: number;
+// UI Components
+import { Button } from "../components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
+import { Badge } from "../components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
+import { Alert, AlertDescription, AlertTitle } from "../components/ui/alert";
+import { Separator } from "../components/ui/separator";
+
+interface PIIResult {
+    column_name: string;
+    is_pii: boolean;
+    pii_type: string | null;
+    confidence: number;
+    sample_matches: string[];
+    detection_method: string;
+    details: string;
 }
 
-function TabPanel({ children, value, index }: TabPanelProps) {
-    return (
-        <div hidden={value !== index} style={{ paddingTop: 24 }}>
-            {value === index && children}
-        </div>
-    );
-}
-
-// File upload area component
-function FileUploadArea({
-    accept,
-    onFileSelect,
-    uploading,
-    progress,
-}: {
-    accept: string;
-    onFileSelect: (file: File) => void;
-    uploading: boolean;
-    progress: number;
-}) {
-    const [dragOver, setDragOver] = useState(false);
-
-    const handleDrop = useCallback((e: React.DragEvent) => {
-        e.preventDefault();
-        setDragOver(false);
-        const file = e.dataTransfer.files[0];
-        if (file) onFileSelect(file);
-    }, [onFileSelect]);
-
-    const handleDragOver = useCallback((e: React.DragEvent) => {
-        e.preventDefault();
-        setDragOver(true);
-    }, []);
-
-    const handleDragLeave = useCallback(() => {
-        setDragOver(false);
-    }, []);
-
-    return (
-        <Box
-            onDrop={handleDrop}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            sx={{
-                border: '2px dashed',
-                borderColor: dragOver ? 'primary.main' : 'divider',
-                borderRadius: 2,
-                p: 4,
-                textAlign: 'center',
-                backgroundColor: dragOver ? 'rgba(102, 126, 234, 0.1)' : 'transparent',
-                transition: 'all 0.2s',
-                cursor: uploading ? 'not-allowed' : 'pointer',
-            }}
-        >
-            {uploading ? (
-                <Box>
-                    <CircularProgress size={48} sx={{ mb: 2 }} />
-                    <Typography>Uploading...</Typography>
-                    <LinearProgress variant="determinate" value={progress} sx={{ mt: 2, mx: 'auto', maxWidth: 300 }} />
-                </Box>
-            ) : (
-                <>
-                    <UploadIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
-                    <Typography variant="h6" gutterBottom>
-                        Drag & drop file here
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" gutterBottom>
-                        or click to browse
-                    </Typography>
-                    <Button
-                        variant="outlined"
-                        component="label"
-                        sx={{ mt: 2 }}
-                    >
-                        Select File
-                        <input
-                            type="file"
-                            hidden
-                            accept={accept}
-                            onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (file) onFileSelect(file);
-                            }}
-                        />
-                    </Button>
-                </>
-            )}
-        </Box>
-    );
-}
-
-export default function ProjectDetailPage() {
-    const { id } = useParams<{ id: string }>();
+export default function PrivacyDetailPage() {
+    const { validationId } = useParams<{ validationId: string }>();
     const navigate = useNavigate();
-    const queryClient = useQueryClient();
 
-    const [tab, setTab] = useState(0);
-    const [uploadModelOpen, setUploadModelOpen] = useState(false);
-    const [uploadDatasetOpen, setUploadDatasetOpen] = useState(false);
-    const [benchmarkLoaderOpen, setBenchmarkLoaderOpen] = useState(false);
-    const [modelName, setModelName] = useState('');
-    const [datasetName, setDatasetName] = useState('');
-    const [sensitiveAttrs, setSensitiveAttrs] = useState('');
-    const [targetColumn, setTargetColumn] = useState('');
-    const [uploading, setUploading] = useState(false);
-    const [uploadProgress, setUploadProgress] = useState(0);
-    const [error, setError] = useState('');
-
-    // Fetch project
-    const { data: project, isLoading: projectLoading } = useQuery({
-        queryKey: ['project', id],
-        queryFn: () => projectsApi.get(id!),
-        enabled: !!id,
+    const { data: privacyData, isLoading, error } = useQuery({
+        queryKey: ['privacyDetails', validationId],
+        queryFn: () => validationApi.getPrivacyDetails(validationId!),
+        enabled: !!validationId,
+        retry: 1,
     });
 
-    // Fetch models
-    const { data: models, isLoading: modelsLoading } = useQuery({
-        queryKey: ['models', id],
-        queryFn: () => modelsApi.list(id!),
-        enabled: !!id,
-    });
-
-    // Fetch datasets
-    const { data: datasets, isLoading: datasetsLoading } = useQuery({
-        queryKey: ['datasets', id],
-        queryFn: () => datasetsApi.list(id!),
-        enabled: !!id,
-    });
-
-    // Fetch validation history
-    const { data: validationHistory, isLoading: validationsLoading } = useQuery({
-        queryKey: ['validations', id],
-        queryFn: () => validationApi.getHistory(id!),
-        enabled: !!id && tab === 2,
-    });
-
-    // Upload model
-    const handleModelUpload = async (file: File) => {
-        if (!modelName.trim()) {
-            setError('Please enter a model name');
-            return;
-        }
-
-        setUploading(true);
-        setError('');
-
-        try {
-            await modelsApi.upload(id!, file, modelName);
-            queryClient.invalidateQueries({ queryKey: ['models', id] });
-            queryClient.invalidateQueries({ queryKey: ['project', id] });
-            setUploadModelOpen(false);
-            setModelName('');
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'Upload failed');
-        } finally {
-            setUploading(false);
-            setUploadProgress(0);
-        }
-    };
-
-    // Upload dataset
-    const handleDatasetUpload = async (file: File) => {
-        if (!datasetName.trim()) {
-            setError('Please enter a dataset name');
-            return;
-        }
-
-        setUploading(true);
-        setError('');
-
-        try {
-            // Create FormData
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('name', datasetName);
-            formData.append('project_id', id!);
-            if (sensitiveAttrs) formData.append('sensitive_attributes', sensitiveAttrs);
-            if (targetColumn) formData.append('target_column', targetColumn);
-
-            await datasetsApi.upload(id!, file, datasetName);
-            queryClient.invalidateQueries({ queryKey: ['datasets', id] });
-            queryClient.invalidateQueries({ queryKey: ['project', id] });
-            setUploadDatasetOpen(false);
-            setDatasetName('');
-            setSensitiveAttrs('');
-            setTargetColumn('');
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'Upload failed');
-        } finally {
-            setUploading(false);
-            setUploadProgress(0);
-        }
-    };
-
-    // Delete model
-    const handleDeleteModel = async (modelId: string) => {
-        if (!confirm('Are you sure you want to delete this model?')) return;
-
-        try {
-            await modelsApi.delete(modelId);
-            queryClient.invalidateQueries({ queryKey: ['models', id] });
-            queryClient.invalidateQueries({ queryKey: ['project', id] });
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to delete model');
-        }
-    };
-
-    // Delete dataset
-    const handleDeleteDataset = async (datasetId: string) => {
-        if (!confirm('Are you sure you want to delete this dataset?')) return;
-
-        try {
-            await datasetsApi.delete(datasetId);
-            queryClient.invalidateQueries({ queryKey: ['datasets', id] });
-            queryClient.invalidateQueries({ queryKey: ['project', id] });
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to delete dataset');
-        }
-    };
-
-    if (projectLoading) {
+    if (isLoading) {
         return (
-            <Box sx={{ display: 'flex', justifyContent: 'center', p: 8 }}>
-                <CircularProgress />
-            </Box>
+            <div className="flex h-[80vh] w-full items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
+            </div>
         );
     }
 
-    if (!project) {
+    if (error || !privacyData) {
         return (
-            <Container maxWidth="xl" sx={{ py: 4 }}>
-                <Alert severity="error">Project not found</Alert>
-            </Container>
+            <div className="container max-w-4xl py-10">
+                <Alert variant="destructive" className="bg-red-500/10 border-red-500/20">
+                    <ShieldAlert className="h-4 w-4" />
+                    <AlertTitle>Error</AlertTitle>
+                    <AlertDescription>
+                        {error instanceof Error ? error.message : 'Failed to load privacy details'}
+                    </AlertDescription>
+                </Alert>
+                <Button variant="ghost" className="mt-4" onClick={() => navigate(-1)}>
+                    <ArrowLeft className="mr-2 h-4 w-4" /> Go Back
+                </Button>
+            </div>
         );
     }
+
+    const piiDetected = privacyData.pii_results?.filter((pii: PIIResult) => pii.is_pii) || [];
 
     return (
-        <Container maxWidth="xl" sx={{ py: 4 }}>
-            {/* Header */}
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 4 }}>
-                <IconButton onClick={() => navigate('/projects')} sx={{ mr: 2 }}>
-                    <BackIcon />
-                </IconButton>
-                <Box sx={{ flex: 1 }}>
-                    <Typography variant="h4" sx={{ fontWeight: 700 }}>
-                        {project.name}
-                    </Typography>
-                    <Typography variant="body1" color="text.secondary">
-                        {project.description || 'No description'}
-                    </Typography>
-                </Box>
-                <Button
-                    variant="contained"
-                    startIcon={<RunIcon />}
-                    onClick={() => navigate(`/projects/${id}/validate`)}
-                >
-                    Run Validation
+        <div className="container max-w-6xl py-8 animate-in fade-in duration-500">
+            {/* Header Section */}
+            <header className="mb-8 space-y-4">
+                <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="text-muted-foreground hover:text-white">
+                    <ArrowLeft className="mr-2 h-4 w-4" /> Back to Validation
                 </Button>
-            </Box>
+                
+                <div className="flex items-center gap-4">
+                    <div className="rounded-xl bg-orange-500/10 p-3 ring-1 ring-orange-500/20">
+                        <Lock className="h-8 w-8 text-orange-500" />
+                    </div>
+                    <div>
+                        <h1 className="text-3xl font-bold tracking-tight">Privacy Validation</h1>
+                        <p className="text-sm text-muted-foreground font-mono">ID: {validationId}</p>
+                    </div>
+                </div>
+            </header>
 
-            {/* Tabs */}
-            <Tabs value={tab} onChange={(_, v) => setTab(v)}>
-                <Tab icon={<ModelIcon />} iconPosition="start" label={`Models (${models?.length || 0})`} />
-                <Tab icon={<DatasetIcon />} iconPosition="start" label={`Datasets (${datasets?.length || 0})`} />
-                <Tab icon={<ValidationIcon />} iconPosition="start" label="Validations" />
-            </Tabs>
+            <div className="grid gap-6">
+                {/* Overall Status Banner */}
+                <Card className={`border-none ${privacyData.overall_passed ? 'bg-green-500/10' : 'bg-red-500/10'}`}>
+                    <CardContent className="flex items-center justify-between p-6">
+                        <div className="space-y-1">
+                            <p className="text-sm font-medium opacity-70">Security Posture</p>
+                            <h3 className="text-xl font-bold">Overall Privacy Compliance</h3>
+                        </div>
+                        <Badge className={`px-4 py-1.5 text-sm font-bold shadow-lg ${
+                            privacyData.overall_passed ? 'bg-green-600 hover:bg-green-600' : 'bg-red-600 hover:bg-red-600'
+                        }`}>
+                            {privacyData.overall_passed ? 'PASSED' : 'FAILED'}
+                        </Badge>
+                    </CardContent>
+                </Card>
 
-            {/* Models Tab */}
-            <TabPanel value={tab} index={0}>
-                <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
-                    <Button
-                        variant="contained"
-                        startIcon={<UploadIcon />}
-                        onClick={() => setUploadModelOpen(true)}
-                    >
-                        Upload Model
-                    </Button>
-                </Box>
+                {/* PII Detection */}
+                <Card className="border-white/5 bg-card/50 backdrop-blur-sm">
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            {piiDetected.length === 0 ? <CheckCircle2 className="text-green-500" /> : <AlertTriangle className="text-red-500" />}
+                            PII Detection Results
+                        </CardTitle>
+                        <CardDescription>Scanning for Personally Identifiable Information across all features</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        {piiDetected.length === 0 ? (
+                            <div className="flex items-center gap-3 rounded-lg border border-green-500/20 bg-green-500/5 p-4 text-green-400">
+                                <ShieldCheck className="h-5 w-5" />
+                                <span className="text-sm font-medium">No PII detected. Data is sanitized.</span>
+                            </div>
+                        ) : (
+                            <div className="space-y-4">
+                                <Alert variant="destructive" className="bg-red-500/5 border-red-500/20">
+                                    <AlertDescription className="text-red-400">
+                                        Found {piiDetected.length} column(s) containing sensitive identifiers.
+                                    </AlertDescription>
+                                </Alert>
+                                <div className="rounded-md border border-white/5">
+                                    <Table>
+                                        <TableHeader className="bg-white/5">
+                                            <TableRow>
+                                                <TableHead>Column</TableHead>
+                                                <TableHead>PII Type</TableHead>
+                                                <TableHead>Confidence</TableHead>
+                                                <TableHead className="text-right">Method</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {piiDetected.map((pii: PIIResult, idx: number) => (
+                                                <TableRow key={idx}>
+                                                    <TableCell className="font-bold">{pii.column_name}</TableCell>
+                                                    <TableCell>
+                                                        <Badge variant="outline" className="border-red-500/30 text-red-400 bg-red-500/5 uppercase text-[10px]">
+                                                            {pii.pii_type}
+                                                        </Badge>
+                                                    </TableCell>
+                                                    <TableCell>{(pii.confidence * 100).toFixed(0)}%</TableCell>
+                                                    <TableCell className="text-right text-muted-foreground text-xs">{pii.detection_method}</TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
 
-                {modelsLoading ? (
-                    <CircularProgress />
-                ) : models?.length === 0 ? (
-                    <Card>
-                        <CardContent sx={{ textAlign: 'center', py: 6 }}>
-                            <ModelIcon sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
-                            <Typography variant="h6" color="text.secondary">
-                                No models uploaded yet
-                            </Typography>
-                            <Button
-                                variant="outlined"
-                                startIcon={<UploadIcon />}
-                                sx={{ mt: 2 }}
-                                onClick={() => setUploadModelOpen(true)}
-                            >
-                                Upload First Model
-                            </Button>
-                        </CardContent>
-                    </Card>
-                ) : (
-                    <TableContainer component={Card}>
-                        <Table>
-                            <TableHead>
-                                <TableRow>
-                                    <TableCell>Name</TableCell>
-                                    <TableCell>Type</TableCell>
-                                    <TableCell>Version</TableCell>
-                                    <TableCell>Size</TableCell>
-                                    <TableCell>Uploaded</TableCell>
-                                    <TableCell align="right">Actions</TableCell>
-                                </TableRow>
-                            </TableHead>
-                            <TableBody>
-                                {models?.map((model: any) => (
-                                    <TableRow key={model.id}>
-                                        <TableCell>
-                                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                                <ModelIcon sx={{ mr: 1, color: 'primary.main' }} />
-                                                {model.name}
-                                            </Box>
-                                        </TableCell>
-                                        <TableCell>
-                                            <Chip label={model.model_type} size="small" />
-                                        </TableCell>
-                                        <TableCell>{model.version}</TableCell>
-                                        <TableCell>{(model.file_size / 1024).toFixed(1)} KB</TableCell>
-                                        <TableCell>
-                                            {new Date(model.uploaded_at).toLocaleDateString()}
-                                        </TableCell>
-                                        <TableCell align="right">
-                                            <IconButton
-                                                size="small"
-                                                color="error"
-                                                onClick={() => handleDeleteModel(model.id)}
-                                            >
-                                                <DeleteIcon />
-                                            </IconButton>
-                                        </TableCell>
-                                    </TableRow>
+                {/* k-Anonymity Analysis */}
+                {privacyData.k_anonymity && (
+                    <Card className="border-white/5 bg-card/50">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                {privacyData.k_anonymity.satisfies_k ? <CheckCircle2 className="text-green-500" /> : <AlertTriangle className="text-red-500" />}
+                                $k$-Anonymity Analysis
+                            </CardTitle>
+                            <CardDescription>Quantifying the risk of re-identification through quasi-identifiers</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                {[
+                                    { label: "Target $k$", value: privacyData.k_anonymity.k_value },
+                                    { 
+                                        label: "Measured Min $k$", 
+                                        value: privacyData.k_anonymity.actual_min_k,
+                                        status: privacyData.k_anonymity.satisfies_k ? "text-green-400" : "text-red-400" 
+                                    },
+                                    { 
+                                        label: "Violating Groups", 
+                                        value: `${privacyData.k_anonymity.violating_groups_count} / ${privacyData.k_anonymity.total_groups}`,
+                                        status: "text-red-400"
+                                    }
+                                ].map((stat, i) => (
+                                    <div key={i} className="rounded-xl border border-white/5 bg-black/20 p-4">
+                                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{stat.label}</p>
+                                        <p className={`text-2xl font-bold mt-1 ${stat.status || ""}`}>{stat.value}</p>
+                                    </div>
                                 ))}
-                            </TableBody>
-                        </Table>
-                    </TableContainer>
-                )}
-            </TabPanel>
+                            </div>
 
-            {/* Datasets Tab */}
-            <TabPanel value={tab} index={1}>
-                <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, mb: 2 }}>
-                    <Button
-                        variant="outlined"
-                        onClick={() => setBenchmarkLoaderOpen(true)}
-                    >
-                        Load Benchmark Dataset
-                    </Button>
-                    <Button
-                        variant="contained"
-                        startIcon={<UploadIcon />}
-                        onClick={() => setUploadDatasetOpen(true)}
-                    >
-                        Upload Dataset
-                    </Button>
-                </Box>
-
-                {datasetsLoading ? (
-                    <CircularProgress />
-                ) : datasets?.length === 0 ? (
-                    <Card>
-                        <CardContent sx={{ textAlign: 'center', py: 6 }}>
-                            <DatasetIcon sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
-                            <Typography variant="h6" color="text.secondary">
-                                No datasets uploaded yet
-                            </Typography>
-                            <Button
-                                variant="outlined"
-                                startIcon={<UploadIcon />}
-                                sx={{ mt: 2 }}
-                                onClick={() => setUploadDatasetOpen(true)}
-                            >
-                                Upload First Dataset
-                            </Button>
-                        </CardContent>
-                    </Card>
-                ) : (
-                    <TableContainer component={Card}>
-                        <Table>
-                            <TableHead>
-                                <TableRow>
-                                    <TableCell>Name</TableCell>
-                                    <TableCell>Rows</TableCell>
-                                    <TableCell>Columns</TableCell>
-                                    <TableCell>Sensitive Attrs</TableCell>
-                                    <TableCell>Uploaded</TableCell>
-                                    <TableCell align="right">Actions</TableCell>
-                                </TableRow>
-                            </TableHead>
-                            <TableBody>
-                                {datasets?.map((dataset: any) => (
-                                    <TableRow key={dataset.id}>
-                                        <TableCell>
-                                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                                <DatasetIcon sx={{ mr: 1, color: 'secondary.main' }} />
-                                                {dataset.name}
-                                            </Box>
-                                        </TableCell>
-                                        <TableCell>{dataset.row_count?.toLocaleString()}</TableCell>
-                                        <TableCell>{dataset.column_count}</TableCell>
-                                        <TableCell>
-                                            {dataset.sensitive_attributes?.length > 0 ? (
-                                                dataset.sensitive_attributes.map((attr: string) => (
-                                                    <Chip key={attr} label={attr} size="small" sx={{ mr: 0.5 }} />
-                                                ))
-                                            ) : (
-                                                <Typography variant="body2" color="text.disabled">None</Typography>
-                                            )}
-                                        </TableCell>
-                                        <TableCell>
-                                            {new Date(dataset.uploaded_at).toLocaleDateString()}
-                                        </TableCell>
-                                        <TableCell align="right">
-                                            <IconButton
-                                                size="small"
-                                                color="error"
-                                                onClick={() => handleDeleteDataset(dataset.id)}
-                                            >
-                                                <DeleteIcon />
-                                            </IconButton>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </TableContainer>
-                )}
-            </TabPanel>
-
-            {/* Validations Tab */}
-            <TabPanel value={tab} index={2}>
-                {validationsLoading ? (
-                    <CircularProgress />
-                ) : validationHistory?.length === 0 ? (
-                    <Card>
-                        <CardContent sx={{ textAlign: 'center', py: 6 }}>
-                            <ValidationIcon sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
-                            <Typography variant="h6" color="text.secondary">
-                                No validations run yet
-                            </Typography>
-                            <Button
-                                variant="contained"
-                                startIcon={<RunIcon />}
-                                sx={{ mt: 2 }}
-                                onClick={() => navigate(`/projects/${id}/validate`)}
-                            >
-                                Run First Validation
-                            </Button>
-                        </CardContent>
-                    </Card>
-                ) : (
-                    <>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                            <Typography variant="h6">Validation History</Typography>
-                            <Button
-                                variant="contained"
-                                startIcon={<RunIcon />}
-                                onClick={() => navigate(`/projects/${id}/validate`)}
-                            >
-                                Run New Validation
-                            </Button>
-                        </Box>
-                        
-                        <TableContainer component={Card}>
-                            <Table>
-                                <TableHead>
-                                    <TableRow>
-                                        <TableCell>Date</TableCell>
-                                        <TableCell>Model</TableCell>
-                                        <TableCell>Dataset</TableCell>
-                                        <TableCell>Status</TableCell>
-                                        <TableCell>Fairness</TableCell>
-                                        <TableCell>Transparency</TableCell>
-                                        <TableCell>Privacy</TableCell>
-                                        <TableCell align="right">Actions</TableCell>
-                                    </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                    {validationHistory?.map((validation: any) => (
-                                        <TableRow key={validation.suite_id}>
-                                            <TableCell>
-                                                {new Date(validation.started_at).toLocaleDateString()}
-                                                <br />
-                                                <Typography variant="caption" color="text.secondary">
-                                                    {new Date(validation.started_at).toLocaleTimeString()}
-                                                </Typography>
-                                            </TableCell>
-                                            <TableCell>{validation.model_name}</TableCell>
-                                            <TableCell>{validation.dataset_name}</TableCell>
-                                            <TableCell>
-                                                <Chip
-                                                    label={validation.overall_passed ? 'PASSED' : 'FAILED'}
-                                                    color={validation.overall_passed ? 'success' : 'error'}
-                                                    size="small"
-                                                />
-                                            </TableCell>
-                                            <TableCell>
-                                                {validation.validations.fairness.completed ? (
-                                                    <Chip
-                                                        label={`${validation.validations.fairness.passed_count}/${validation.validations.fairness.metrics_count}`}
-                                                        color={validation.validations.fairness.passed_count === validation.validations.fairness.metrics_count ? 'success' : 'warning'}
-                                                        size="small"
-                                                    />
-                                                ) : (
-                                                    <Chip label="N/A" size="small" variant="outlined" />
-                                                )}
-                                            </TableCell>
-                                            <TableCell>
-                                                {validation.validations.transparency.completed ? (
-                                                    <Chip
-                                                        label={`${validation.validations.transparency.passed_count}/${validation.validations.transparency.metrics_count}`}
-                                                        color={validation.validations.transparency.passed_count === validation.validations.transparency.metrics_count ? 'success' : 'warning'}
-                                                        size="small"
-                                                    />
-                                                ) : (
-                                                    <Chip label="N/A" size="small" variant="outlined" />
-                                                )}
-                                            </TableCell>
-                                            <TableCell>
-                                                {validation.validations.privacy.completed ? (
-                                                    <Chip
-                                                        label={`${validation.validations.privacy.passed_count}/${validation.validations.privacy.metrics_count}`}
-                                                        color={validation.validations.privacy.passed_count === validation.validations.privacy.metrics_count ? 'success' : 'warning'}
-                                                        size="small"
-                                                    />
-                                                ) : (
-                                                    <Chip label="N/A" size="small" variant="outlined" />
-                                                )}
-                                            </TableCell>
-                                            <TableCell align="right">
-                                                <Button
-                                                    size="small"
-                                                    onClick={() => navigate(`/projects/${id}/validate?suite=${validation.suite_id}`)}
-                                                >
-                                                    View Details
-                                                </Button>
-                                            </TableCell>
-                                        </TableRow>
+                            <div className="space-y-2">
+                                <p className="text-xs font-semibold text-muted-foreground uppercase">Quasi-identifiers Checked</p>
+                                <div className="flex flex-wrap gap-2">
+                                    {privacyData.k_anonymity.quasi_identifiers.map((qi: string) => (
+                                        <Badge key={qi} variant="secondary" className="bg-white/5 hover:bg-white/10">{qi}</Badge>
                                     ))}
-                                </TableBody>
-                            </Table>
-                        </TableContainer>
-                    </>
+                                </div>
+                            </div>
+
+                            {privacyData.k_anonymity.violating_groups.length > 0 && (
+                                <div className="space-y-3">
+                                    <Separator className="bg-white/5" />
+                                    <p className="text-sm font-medium text-red-400">Groups at high risk of identification:</p>
+                                    <div className="overflow-hidden rounded-md border border-white/5">
+                                        <Table>
+                                            <TableHeader className="bg-red-500/5">
+                                                <TableRow>
+                                                    {privacyData.k_anonymity.quasi_identifiers.map((qi: string) => (
+                                                        <TableHead key={qi} className="text-[11px] uppercase">{qi}</TableHead>
+                                                    ))}
+                                                    <TableHead className="text-right">Frequency</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {privacyData.k_anonymity.violating_groups.slice(0, 5).map((group: any, idx: number) => (
+                                                    <TableRow key={idx} className="hover:bg-white/5">
+                                                        {privacyData.k_anonymity!.quasi_identifiers.map((qi: string) => (
+                                                            <TableCell key={qi} className="text-xs">{String(group[qi])}</TableCell>
+                                                        ))}
+                                                        <TableCell className="text-right">
+                                                            <Badge variant="destructive" className="h-5 text-[10px]">{group.count}</Badge>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    </div>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
                 )}
-            </TabPanel>
 
-            {/* Upload Model Dialog */}
-            <Dialog open={uploadModelOpen} onClose={() => setUploadModelOpen(false)} maxWidth="sm" fullWidth>
-                <DialogTitle>Upload Model</DialogTitle>
-                <DialogContent>
-                    {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+                {/* Recommendations & Warnings */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {privacyData.recommendations?.length > 0 && (
+                        <Card className="border-white/5 bg-indigo-500/5">
+                            <CardHeader>
+                                <CardTitle className="text-sm flex items-center gap-2">
+                                    <Info className="h-4 w-4 text-indigo-400" /> Mitigation Steps
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <ul className="space-y-3">
+                                    {privacyData.recommendations.map((rec: string, idx: number) => (
+                                        <li key={idx} className="text-xs leading-relaxed border-l-2 border-indigo-500/30 pl-3 py-1 font-mono text-indigo-100/80">
+                                            {rec}
+                                        </li>
+                                    ))}
+                                </ul>
+                            </CardContent>
+                        </Card>
+                    )}
 
-                    <TextField
-                        label="Model Name"
-                        fullWidth
-                        value={modelName}
-                        onChange={(e) => setModelName(e.target.value)}
-                        sx={{ mb: 3, mt: 1 }}
-                    />
-
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                        Supported formats: .pkl, .joblib, .h5, .keras, .pt, .pth, .onnx
-                    </Typography>
-
-                    <FileUploadArea
-                        accept=".pkl,.joblib,.pickle,.h5,.keras,.pt,.pth,.onnx"
-                        onFileSelect={handleModelUpload}
-                        uploading={uploading}
-                        progress={uploadProgress}
-                    />
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setUploadModelOpen(false)}>Cancel</Button>
-                </DialogActions>
-            </Dialog>
-
-            {/* Upload Dataset Dialog */}
-            <Dialog open={uploadDatasetOpen} onClose={() => setUploadDatasetOpen(false)} maxWidth="sm" fullWidth>
-                <DialogTitle>Upload Dataset</DialogTitle>
-                <DialogContent>
-                    {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-
-                    <TextField
-                        label="Dataset Name"
-                        fullWidth
-                        value={datasetName}
-                        onChange={(e) => setDatasetName(e.target.value)}
-                        sx={{ mb: 2, mt: 1 }}
-                    />
-
-                    <TextField
-                        label="Sensitive Attributes (comma-separated)"
-                        fullWidth
-                        value={sensitiveAttrs}
-                        onChange={(e) => setSensitiveAttrs(e.target.value)}
-                        placeholder="e.g., gender, race, age"
-                        helperText="Columns to use for fairness analysis"
-                        sx={{ mb: 2 }}
-                    />
-
-                    <TextField
-                        label="Target Column"
-                        fullWidth
-                        value={targetColumn}
-                        onChange={(e) => setTargetColumn(e.target.value)}
-                        placeholder="e.g., approved, label"
-                        helperText="The prediction target column"
-                        sx={{ mb: 3 }}
-                    />
-
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                        Supported format: CSV
-                    </Typography>
-
-                    <FileUploadArea
-                        accept=".csv"
-                        onFileSelect={handleDatasetUpload}
-                        uploading={uploading}
-                        progress={uploadProgress}
-                    />
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setUploadDatasetOpen(false)}>Cancel</Button>
-                </DialogActions>
-            </Dialog>
-
-            {/* Benchmark Dataset Loader */}
-            <BenchmarkDatasetLoader
-                open={benchmarkLoaderOpen}
-                onClose={() => setBenchmarkLoaderOpen(false)}
-                projectId={id!}
-                onSuccess={(datasetName) => {
-                    queryClient.invalidateQueries({ queryKey: ['datasets', id] });
-                    alert(`Successfully loaded ${datasetName} dataset!`);
-                }}
-            />
-        </Container>
+                    {privacyData.warnings?.length > 0 && (
+                        <Card className="border-white/5 bg-orange-500/5">
+                            <CardHeader>
+                                <CardTitle className="text-sm flex items-center gap-2 text-orange-400">
+                                    <AlertTriangle className="h-4 w-4" /> System Warnings
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-2">
+                                {privacyData.warnings.map((warning: string, idx: number) => (
+                                    <div key={idx} className="text-xs bg-orange-500/10 text-orange-200/70 p-2 rounded border border-orange-500/20">
+                                        {warning}
+                                    </div>
+                                ))}
+                            </CardContent>
+                        </Card>
+                    )}
+                </div>
+            </div>
+        </div>
     );
 }

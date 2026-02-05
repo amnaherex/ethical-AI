@@ -1,37 +1,25 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import {
-    Container,
-    Typography,
-    Box,
-    Card,
-    CardContent,
-    Button,
-    Chip,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
-    Paper,
-    Alert,
-    List,
-    ListItem,
-    ListItemText,
-    CircularProgress,
-    Divider
-} from '@mui/material';
-import {
-    ArrowBack as ArrowBackIcon,
-    Lock as LockIcon,
-    CheckCircle as CheckIcon,
-    Error as ErrorIcon,
-    Warning as WarningIcon
-} from '@mui/icons-material';
+import { 
+    ArrowLeft, 
+    ShieldAlert, 
+    ShieldCheck, 
+    Lock, 
+    AlertTriangle, 
+    CheckCircle2, 
+    Info, 
+    Loader2 
+} from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { validationApi } from '../services/api';
 
-// Type definitions for privacy validation response
+// UI Components
+import { Button } from "../components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
+import { Badge } from "../components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
+import { Alert, AlertDescription, AlertTitle } from "../components/ui/alert";
+import { Separator } from "../components/ui/separator";
+
 interface PIIResult {
     column_name: string;
     is_pii: boolean;
@@ -42,13 +30,10 @@ interface PIIResult {
     details: string;
 }
 
-
-
 export default function PrivacyDetailPage() {
     const { validationId } = useParams<{ validationId: string }>();
     const navigate = useNavigate();
 
-    // Use tanstack query to fetch privacy details with proper authentication
     const { data: privacyData, isLoading, error } = useQuery({
         queryKey: ['privacyDetails', validationId],
         queryFn: () => validationApi.getPrivacyDetails(validationId!),
@@ -58,283 +43,233 @@ export default function PrivacyDetailPage() {
 
     if (isLoading) {
         return (
-            <Container sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '80vh' }}>
-                <CircularProgress />
-            </Container>
+            <div className="flex h-[80vh] w-full items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
+            </div>
         );
     }
 
     if (error || !privacyData) {
         return (
-            <Container sx={{ mt: 4 }}>
-                <Alert severity="error">
-                    {error instanceof Error ? error.message : 'Failed to load privacy details'}
+            <div className="container max-w-4xl py-10">
+                <Alert variant="destructive" className="bg-red-500/10 border-red-500/20">
+                    <ShieldAlert className="h-4 w-4" />
+                    <AlertTitle>Error</AlertTitle>
+                    <AlertDescription>
+                        {error instanceof Error ? error.message : 'Failed to load privacy details'}
+                    </AlertDescription>
                 </Alert>
-                <Button startIcon={<ArrowBackIcon />} onClick={() => navigate(-1)} sx={{ mt: 2 }}>
-                    Go Back
+                <Button variant="ghost" className="mt-4" onClick={() => navigate(-1)}>
+                    <ArrowLeft className="mr-2 h-4 w-4" /> Go Back
                 </Button>
-            </Container>
+            </div>
         );
     }
 
     const piiDetected = privacyData.pii_results?.filter((pii: PIIResult) => pii.is_pii) || [];
 
     return (
-        <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-            {/* Header */}
-            <Box sx={{ mb: 4 }}>
-                <Button startIcon={<ArrowBackIcon />} onClick={() => navigate(-1)} sx={{ mb: 2 }}>
-                    Back to Validation
+        <div className="container max-w-6xl py-8 animate-in fade-in duration-500">
+            {/* Header Section */}
+            <header className="mb-8 space-y-4">
+                <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="text-muted-foreground hover:text-white">
+                    <ArrowLeft className="mr-2 h-4 w-4" /> Back to Validation
                 </Button>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <LockIcon sx={{ fontSize: 48, color: '#ff9800' }} />
-                    <Box>
-                        <Typography variant="h4">Privacy Validation Details</Typography>
-                        <Typography variant="body2" color="text.secondary">
-                            Validation ID: {validationId}
-                        </Typography>
-                    </Box>
-                </Box>
-            </Box>
+                
+                <div className="flex items-center gap-4">
+                    <div className="rounded-xl bg-orange-500/10 p-3 ring-1 ring-orange-500/20">
+                        <Lock className="h-8 w-8 text-orange-500" />
+                    </div>
+                    <div>
+                        <h1 className="text-3xl font-bold tracking-tight">Privacy Validation</h1>
+                        <p className="text-sm text-muted-foreground font-mono">ID: {validationId}</p>
+                    </div>
+                </div>
+            </header>
 
-            {/* Overall Status */}
-            <Card sx={{ mb: 3 }}>
-                <CardContent>
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <Typography variant="h6">Overall Privacy Status</Typography>
-                        <Chip
-                            icon={privacyData.overall_passed ? <CheckIcon /> : <ErrorIcon />}
-                            label={privacyData.overall_passed ? 'PASSED' : 'FAILED'}
-                            color={privacyData.overall_passed ? 'success' : 'error'}
-                            sx={{ fontSize: '1rem', py: 2 }}
-                        />
-                    </Box>
-                </CardContent>
-            </Card>
+            <div className="grid gap-6">
+                {/* Overall Status Banner */}
+                <Card className={`border-none ${privacyData.overall_passed ? 'bg-green-500/10' : 'bg-red-500/10'}`}>
+                    <CardContent className="flex items-center justify-between p-6">
+                        <div className="space-y-1">
+                            <p className="text-sm font-medium opacity-70">Security Posture</p>
+                            <h3 className="text-xl font-bold">Overall Privacy Compliance</h3>
+                        </div>
+                        <Badge className={`px-4 py-1.5 text-sm font-bold shadow-lg ${
+                            privacyData.overall_passed ? 'bg-green-600 hover:bg-green-600' : 'bg-red-600 hover:bg-red-600'
+                        }`}>
+                            {privacyData.overall_passed ? 'PASSED' : 'FAILED'}
+                        </Badge>
+                    </CardContent>
+                </Card>
 
-            {/* PII Detection Section */}
-            <Card sx={{ mb: 3 }}>
-                <CardContent>
-                    <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-                        {piiDetected.length === 0 ? <CheckIcon color="success" /> : <ErrorIcon color="error" />}
-                        PII Detection Results
-                    </Typography>
-                    
-                    {piiDetected.length === 0 ? (
-                        <Alert severity="success">
-                            ✓ No Personally Identifiable Information (PII) detected in the dataset
-                        </Alert>
-                    ) : (
-                        <>
-                            <Alert severity="error" sx={{ mb: 2 }}>
-                                ⚠️ {piiDetected.length} column(s) contain PII that should be removed or anonymized
-                            </Alert>
-                            <TableContainer component={Paper} variant="outlined">
-                                <Table>
-                                    <TableHead>
-                                        <TableRow>
-                                            <TableCell>Column</TableCell>
-                                            <TableCell>PII Type</TableCell>
-                                            <TableCell>Confidence</TableCell>
-                                            <TableCell>Detection Method</TableCell>
-                                        </TableRow>
-                                    </TableHead>
-                                    <TableBody>
-                                        {piiDetected.map((pii: PIIResult, idx: number) => (
-                                            <TableRow key={idx}>
-                                                <TableCell><strong>{pii.column_name}</strong></TableCell>
-                                                <TableCell>
-                                                    <Chip label={pii.pii_type} size="small" color="error" />
-                                                </TableCell>
-                                                <TableCell>{(pii.confidence * 100).toFixed(0)}%</TableCell>
-                                                <TableCell>{pii.detection_method}</TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            </TableContainer>
-                        </>
-                    )}
-                </CardContent>
-            </Card>
-
-            {/* k-Anonymity Section */}
-            {privacyData.k_anonymity && (
-                <Card sx={{ mb: 3 }}>
+                {/* PII Detection */}
+                <Card className="border-white/5 bg-card/50 backdrop-blur-sm">
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            {piiDetected.length === 0 ? <CheckCircle2 className="text-green-500" /> : <AlertTriangle className="text-red-500" />}
+                            PII Detection Results
+                        </CardTitle>
+                        <CardDescription>Scanning for Personally Identifiable Information across all features</CardDescription>
+                    </CardHeader>
                     <CardContent>
-                        <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-                            {privacyData.k_anonymity.satisfies_k ? <CheckIcon color="success" /> : <ErrorIcon color="error" />}
-                            k-Anonymity (k={privacyData.k_anonymity.k_value})
-                        </Typography>
-
-                        <Box sx={{ mb: 2 }}>
-                            <Chip
-                                label={privacyData.k_anonymity.satisfies_k ? 'PASSED' : 'FAILED'}
-                                color={privacyData.k_anonymity.satisfies_k ? 'success' : 'error'}
-                                sx={{ mr: 2 }}
-                            />
-                            <Typography variant="body2" component="span" color="text.secondary">
-                                Ensures each combination of quasi-identifiers appears at least k times
-                            </Typography>
-                        </Box>
-
-                        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 2, mb: 2 }}>
-                            <Paper variant="outlined" sx={{ p: 2 }}>
-                                <Typography variant="caption" color="text.secondary">Required k</Typography>
-                                <Typography variant="h5">{privacyData.k_anonymity.k_value}</Typography>
-                            </Paper>
-                            <Paper variant="outlined" sx={{ p: 2 }}>
-                                <Typography variant="caption" color="text.secondary">Actual Min k</Typography>
-                                <Typography variant="h5" color={privacyData.k_anonymity.satisfies_k ? 'success.main' : 'error.main'}>
-                                    {privacyData.k_anonymity.actual_min_k}
-                                </Typography>
-                            </Paper>
-                            <Paper variant="outlined" sx={{ p: 2 }}>
-                                <Typography variant="caption" color="text.secondary">Violating Groups</Typography>
-                                <Typography variant="h5" color="error">
-                                    {privacyData.k_anonymity.violating_groups_count} / {privacyData.k_anonymity.total_groups}
-                                </Typography>
-                            </Paper>
-                        </Box>
-
-                        <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                            Quasi-identifiers checked:
-                        </Typography>
-                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
-                            {privacyData.k_anonymity.quasi_identifiers.map((qi: string) => (
-                                <Chip key={qi} label={qi} size="small" variant="outlined" />
-                            ))}
-                        </Box>
-
-                        {privacyData.k_anonymity.violating_groups.length > 0 && (
-                            <>
-                                <Divider sx={{ my: 2 }} />
-                                <Typography variant="subtitle2" color="error" sx={{ mb: 1 }}>
-                                    Sample Violating Groups (uniquely identifiable):
-                                </Typography>
-                                <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 400 }}>
-                                    <Table size="small">
-                                        <TableHead>
+                        {piiDetected.length === 0 ? (
+                            <div className="flex items-center gap-3 rounded-lg border border-green-500/20 bg-green-500/5 p-4 text-green-400">
+                                <ShieldCheck className="h-5 w-5" />
+                                <span className="text-sm font-medium">No PII detected. Data is sanitized.</span>
+                            </div>
+                        ) : (
+                            <div className="space-y-4">
+                                <Alert variant="destructive" className="bg-red-500/5 border-red-500/20">
+                                    <AlertDescription className="text-red-400">
+                                        Found {piiDetected.length} column(s) containing sensitive identifiers.
+                                    </AlertDescription>
+                                </Alert>
+                                <div className="rounded-md border border-white/5">
+                                    <Table>
+                                        <TableHeader className="bg-white/5">
                                             <TableRow>
-                                                {privacyData.k_anonymity.quasi_identifiers.map((qi: string) => (
-                                                    <TableCell key={qi}>{qi}</TableCell>
-                                                ))}
-                                                <TableCell>Count</TableCell>
+                                                <TableHead>Column</TableHead>
+                                                <TableHead>PII Type</TableHead>
+                                                <TableHead>Confidence</TableHead>
+                                                <TableHead className="text-right">Method</TableHead>
                                             </TableRow>
-                                        </TableHead>
+                                        </TableHeader>
                                         <TableBody>
-                                            {privacyData.k_anonymity.violating_groups.slice(0, 10).map((group: any, idx: number) => (
+                                            {piiDetected.map((pii: PIIResult, idx: number) => (
                                                 <TableRow key={idx}>
-                                                    {privacyData.k_anonymity!.quasi_identifiers.map((qi: string) => (
-                                                        <TableCell key={qi}>{String(group[qi])}</TableCell>
-                                                    ))}
+                                                    <TableCell className="font-bold">{pii.column_name}</TableCell>
                                                     <TableCell>
-                                                        <Chip label={group.count} size="small" color="error" />
+                                                        <Badge variant="outline" className="border-red-500/30 text-red-400 bg-red-500/5 uppercase text-[10px]">
+                                                            {pii.pii_type}
+                                                        </Badge>
                                                     </TableCell>
+                                                    <TableCell>{(pii.confidence * 100).toFixed(0)}%</TableCell>
+                                                    <TableCell className="text-right text-muted-foreground text-xs">{pii.detection_method}</TableCell>
                                                 </TableRow>
                                             ))}
                                         </TableBody>
                                     </Table>
-                                </TableContainer>
-                            </>
+                                </div>
+                            </div>
                         )}
                     </CardContent>
                 </Card>
-            )}
 
-            {/* l-Diversity Section */}
-            {privacyData.l_diversity && (
-                <Card sx={{ mb: 3 }}>
-                    <CardContent>
-                        <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-                            {privacyData.l_diversity.satisfies_l ? <CheckIcon color="success" /> : <ErrorIcon color="error" />}
-                            l-Diversity (l={privacyData.l_diversity.l_value})
-                        </Typography>
+                {/* k-Anonymity Analysis */}
+                {privacyData.k_anonymity && (
+                    <Card className="border-white/5 bg-card/50">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                {privacyData.k_anonymity.satisfies_k ? <CheckCircle2 className="text-green-500" /> : <AlertTriangle className="text-red-500" />}
+                                $k$-Anonymity Analysis
+                            </CardTitle>
+                            <CardDescription>Quantifying the risk of re-identification through quasi-identifiers</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                {[
+                                    { label: "Target $k$", value: privacyData.k_anonymity.k_value },
+                                    { 
+                                        label: "Measured Min $k$", 
+                                        value: privacyData.k_anonymity.actual_min_k,
+                                        status: privacyData.k_anonymity.satisfies_k ? "text-green-400" : "text-red-400" 
+                                    },
+                                    { 
+                                        label: "Violating Groups", 
+                                        value: `${privacyData.k_anonymity.violating_groups_count} / ${privacyData.k_anonymity.total_groups}`,
+                                        status: "text-red-400"
+                                    }
+                                ].map((stat, i) => (
+                                    <div key={i} className="rounded-xl border border-white/5 bg-black/20 p-4">
+                                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{stat.label}</p>
+                                        <p className={`text-2xl font-bold mt-1 ${stat.status || ""}`}>{stat.value}</p>
+                                    </div>
+                                ))}
+                            </div>
 
-                        <Box sx={{ mb: 2 }}>
-                            <Chip
-                                label={privacyData.l_diversity.satisfies_l ? 'PASSED' : 'FAILED'}
-                                color={privacyData.l_diversity.satisfies_l ? 'success' : 'error'}
-                                sx={{ mr: 2 }}
-                            />
-                            <Typography variant="body2" component="span" color="text.secondary">
-                                Ensures each group has at least l distinct values of the sensitive attribute
-                            </Typography>
-                        </Box>
+                            <div className="space-y-2">
+                                <p className="text-xs font-semibold text-muted-foreground uppercase">Quasi-identifiers Checked</p>
+                                <div className="flex flex-wrap gap-2">
+                                    {privacyData.k_anonymity.quasi_identifiers.map((qi: string) => (
+                                        <Badge key={qi} variant="secondary" className="bg-white/5 hover:bg-white/10">{qi}</Badge>
+                                    ))}
+                                </div>
+                            </div>
 
-                        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 2, mb: 2 }}>
-                            <Paper variant="outlined" sx={{ p: 2 }}>
-                                <Typography variant="caption" color="text.secondary">Required l</Typography>
-                                <Typography variant="h5">{privacyData.l_diversity.l_value}</Typography>
-                            </Paper>
-                            <Paper variant="outlined" sx={{ p: 2 }}>
-                                <Typography variant="caption" color="text.secondary">Actual Min l</Typography>
-                                <Typography variant="h5" color={privacyData.l_diversity.satisfies_l ? 'success.main' : 'error.main'}>
-                                    {privacyData.l_diversity.actual_min_l}
-                                </Typography>
-                            </Paper>
-                            <Paper variant="outlined" sx={{ p: 2 }}>
-                                <Typography variant="caption" color="text.secondary">Violating Groups</Typography>
-                                <Typography variant="h5" color="error">
-                                    {privacyData.l_diversity.violating_groups_count} / {privacyData.l_diversity.total_groups}
-                                </Typography>
-                            </Paper>
-                        </Box>
+                            {privacyData.k_anonymity.violating_groups.length > 0 && (
+                                <div className="space-y-3">
+                                    <Separator className="bg-white/5" />
+                                    <p className="text-sm font-medium text-red-400">Groups at high risk of identification:</p>
+                                    <div className="overflow-hidden rounded-md border border-white/5">
+                                        <Table>
+                                            <TableHeader className="bg-red-500/5">
+                                                <TableRow>
+                                                    {privacyData.k_anonymity.quasi_identifiers.map((qi: string) => (
+                                                        <TableHead key={qi} className="text-[11px] uppercase">{qi}</TableHead>
+                                                    ))}
+                                                    <TableHead className="text-right">Frequency</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {privacyData.k_anonymity.violating_groups.slice(0, 5).map((group: any, idx: number) => (
+                                                    <TableRow key={idx} className="hover:bg-white/5">
+                                                        {privacyData.k_anonymity!.quasi_identifiers.map((qi: string) => (
+                                                            <TableCell key={qi} className="text-xs">{String(group[qi])}</TableCell>
+                                                        ))}
+                                                        <TableCell className="text-right">
+                                                            <Badge variant="destructive" className="h-5 text-[10px]">{group.count}</Badge>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    </div>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                )}
 
-                        <Alert severity="info" sx={{ mt: 2 }}>
-                            <Typography variant="body2">
-                                <strong>Sensitive Attribute:</strong> {privacyData.l_diversity.sensitive_attribute}
-                            </Typography>
-                            <Typography variant="caption">
-                                Groups with only 1 distinct value in this column can be used to infer sensitive information
-                            </Typography>
-                        </Alert>
-                    </CardContent>
-                </Card>
-            )}
+                {/* Recommendations & Warnings */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {privacyData.recommendations?.length > 0 && (
+                        <Card className="border-white/5 bg-indigo-500/5">
+                            <CardHeader>
+                                <CardTitle className="text-sm flex items-center gap-2">
+                                    <Info className="h-4 w-4 text-indigo-400" /> Mitigation Steps
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <ul className="space-y-3">
+                                    {privacyData.recommendations.map((rec: string, idx: number) => (
+                                        <li key={idx} className="text-xs leading-relaxed border-l-2 border-indigo-500/30 pl-3 py-1 font-mono text-indigo-100/80">
+                                            {rec}
+                                        </li>
+                                    ))}
+                                </ul>
+                            </CardContent>
+                        </Card>
+                    )}
 
-            {/* Recommendations Section */}
-            {privacyData.recommendations && privacyData.recommendations.length > 0 && (
-                <Card sx={{ mb: 3 }}>
-                    <CardContent>
-                        <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <WarningIcon color="warning" />
-                            Recommendations
-                        </Typography>
-                        <List>
-                            {privacyData.recommendations.map((rec: string, idx: number) => (
-                                <ListItem key={idx} sx={{ py: 0.5 }}>
-                                    <ListItemText
-                                        primary={rec}
-                                        primaryTypographyProps={{
-                                            variant: rec.startsWith('  →') ? 'body2' : 'body1',
-                                            color: rec.startsWith('  →') ? 'text.secondary' : 'text.primary',
-                                            sx: { fontFamily: 'monospace' }
-                                        }}
-                                    />
-                                </ListItem>
-                            ))}
-                        </List>
-                    </CardContent>
-                </Card>
-            )}
-
-            {/* Warnings Section */}
-            {privacyData.warnings && privacyData.warnings.length > 0 && (
-                <Card sx={{ mb: 3 }}>
-                    <CardContent>
-                        <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <WarningIcon color="warning" />
-                            Warnings
-                        </Typography>
-                        {privacyData.warnings.map((warning: string, idx: number) => (
-                            <Alert key={idx} severity="warning" sx={{ mb: 1 }}>
-                                {warning}
-                            </Alert>
-                        ))}
-                    </CardContent>
-                </Card>
-            )}
-        </Container>
+                    {privacyData.warnings?.length > 0 && (
+                        <Card className="border-white/5 bg-orange-500/5">
+                            <CardHeader>
+                                <CardTitle className="text-sm flex items-center gap-2 text-orange-400">
+                                    <AlertTriangle className="h-4 w-4" /> System Warnings
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-2">
+                                {privacyData.warnings.map((warning: string, idx: number) => (
+                                    <div key={idx} className="text-xs bg-orange-500/10 text-orange-200/70 p-2 rounded border border-orange-500/20">
+                                        {warning}
+                                    </div>
+                                ))}
+                            </CardContent>
+                        </Card>
+                    )}
+                </div>
+            </div>
+        </div>
     );
 }

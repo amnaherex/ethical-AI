@@ -1,38 +1,34 @@
-// Projects page - List and manage projects
-
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-    Box,
-    Container,
-    Typography,
-    Button,
-    Card,
-    CardContent,
-    CardActions,
-    Grid,
-    TextField,
-    Dialog,
-    DialogTitle,
-    DialogContent,
-    DialogActions,
-    IconButton,
-    Chip,
-    CircularProgress,
-    Alert,
-} from '@mui/material';
-import {
-    Add as AddIcon,
-    Folder as FolderIcon,
-    Delete as DeleteIcon,
-    Edit as EditIcon,
-    ModelTraining as ModelIcon,
-    Storage as DatasetIcon,
-    Assignment as RequirementIcon,
-} from '@mui/icons-material';
+import { 
+    Plus, 
+    Folder, 
+    Trash2, 
+    Edit3, 
+    Cpu, 
+    Database, 
+    FileText, 
+    Loader2,
+    Search
+} from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { projectsApi } from '../services/api';
 import type { Project } from '../types';
+
+// shadcn UI components
+import { Button } from "../components/ui/button";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "../components/ui/card";
+import { Input } from "../components/ui/input";
+import { 
+    Dialog, 
+    DialogContent, 
+    DialogDescription, 
+    DialogFooter, 
+    DialogHeader, 
+    DialogTitle 
+} from "../components/ui/dialog";
+import { Badge } from "../components/ui/badge";
+import { Alert, AlertDescription } from "../components/ui/alert";
 
 export default function ProjectsPage() {
     const navigate = useNavigate();
@@ -42,13 +38,11 @@ export default function ProjectsPage() {
     const [newProject, setNewProject] = useState({ name: '', description: '' });
     const [error, setError] = useState('');
 
-    // Fetch projects
     const { data: projects, isLoading } = useQuery<Project[]>({
         queryKey: ['projects'],
         queryFn: projectsApi.list,
     });
 
-    // Create mutation
     const createMutation = useMutation({
         mutationFn: projectsApi.create,
         onSuccess: () => {
@@ -56,17 +50,12 @@ export default function ProjectsPage() {
             setCreateOpen(false);
             setNewProject({ name: '', description: '' });
         },
-        onError: (err: Error) => {
-            setError(err.message || 'Failed to create project');
-        },
+        onError: (err: Error) => setError(err.message || 'Failed to create project'),
     });
 
-    // Delete mutation
     const deleteMutation = useMutation({
         mutationFn: projectsApi.delete,
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['projects'] });
-        },
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: ['projects'] }),
     });
 
     const handleCreate = () => {
@@ -79,204 +68,156 @@ export default function ProjectsPage() {
 
     if (isLoading) {
         return (
-            <Box sx={{ display: 'flex', justifyContent: 'center', p: 8 }}>
-                <CircularProgress />
-            </Box>
+            <div className="flex h-64 items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
         );
     }
 
     return (
-        <Container maxWidth="xl" sx={{ py: 4 }}>
-            {/* Header */}
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-                <Box>
-                    <Typography variant="h4" sx={{ fontWeight: 700 }}>
-                        Projects
-                    </Typography>
-                    <Typography variant="body1" color="text.secondary">
-                        Manage your AI validation projects
-                    </Typography>
-                </Box>
-                <Button
-                    variant="contained"
-                    startIcon={<AddIcon />}
-                    onClick={() => setCreateOpen(true)}
-                >
-                    New Project
+        <div className="container mx-auto max-w-7xl px-4 py-8 space-y-8">
+            {/* Header Section */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-6">
+                <div>
+                    <h1 className="text-3xl font-bold tracking-tight">Projects</h1>
+                    <p className="text-muted-foreground mt-1">
+                        Orchestrate and monitor your AI validation workflows.
+                    </p>
+                </div>
+                <Button onClick={() => setCreateOpen(true)} className="bg-indigo-600 hover:bg-indigo-700">
+                    <Plus className="mr-2 h-4 w-4" /> New Project
                 </Button>
-            </Box>
+            </div>
 
             {/* Projects Grid */}
-            <Grid container spacing={3}>
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
                 {projects?.map((project) => (
-                    <Grid key={project.id} size={{ xs: 12, sm: 6, md: 4 }}>
-                        <Card
-                            sx={{
-                                height: '100%',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                cursor: 'pointer',
-                                transition: 'transform 0.2s, box-shadow 0.2s',
-                                '&:hover': {
-                                    transform: 'translateY(-4px)',
-                                    boxShadow: '0 8px 24px rgba(102, 126, 234, 0.2)',
-                                }
-                            }}
-                            onClick={() => navigate(`/projects/${project.id}`)}
-                        >
-                            <CardContent sx={{ flex: 1 }}>
-                                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                                    <Box
-                                        sx={{
-                                            width: 40,
-                                            height: 40,
-                                            borderRadius: 1,
-                                            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            mr: 1.5,
-                                        }}
-                                    >
-                                        <FolderIcon sx={{ color: 'white' }} />
-                                    </Box>
-                                    <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                                        {project.name}
-                                    </Typography>
-                                </Box>
+                    <Card 
+                        key={project.id}
+                        className="group relative flex flex-col overflow-hidden border-border/50 bg-card/50 transition-all hover:shadow-xl hover:shadow-indigo-500/10 hover:border-indigo-500/50 cursor-pointer"
+                        onClick={() => navigate(`/projects/${project.id}`)}
+                    >
+                        <CardHeader className="pb-4">
+                            <div className="flex items-center gap-3">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-600 text-white shadow-inner group-hover:scale-110 transition-transform">
+                                    <Folder className="h-5 w-5" />
+                                </div>
+                                <CardTitle className="line-clamp-1 group-hover:text-indigo-400 transition-colors">
+                                    {project.name}
+                                </CardTitle>
+                            </div>
+                        </CardHeader>
+                        
+                        <CardContent className="flex-1 space-y-4">
+                            <p className="text-sm text-muted-foreground line-clamp-2 h-10">
+                                {project.description || 'No project description provided.'}
+                            </p>
+                            
+                            <div className="flex flex-wrap gap-2">
+                                <Badge variant="secondary" className="bg-background/50 font-normal">
+                                    <Cpu className="mr-1 h-3 w-3 opacity-70" /> {project.model_count || 0} Models
+                                </Badge>
+                                <Badge variant="secondary" className="bg-background/50 font-normal">
+                                    <Database className="mr-1 h-3 w-3 opacity-70" /> {project.dataset_count || 0} Sets
+                                </Badge>
+                                <Badge variant="secondary" className="bg-background/50 font-normal">
+                                    <FileText className="mr-1 h-3 w-3 opacity-70" /> {project.requirement_count || 0} Reqs
+                                </Badge>
+                            </div>
+                        </CardContent>
 
-                                <Typography
-                                    variant="body2"
-                                    color="text.secondary"
-                                    sx={{
-                                        mb: 2,
-                                        display: '-webkit-box',
-                                        WebkitLineClamp: 2,
-                                        WebkitBoxOrient: 'vertical',
-                                        overflow: 'hidden',
-                                    }}
-                                >
-                                    {project.description || 'No description'}
-                                </Typography>
-
-                                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                                    <Chip
-                                        icon={<ModelIcon />}
-                                        label={`${project.model_count || 0} Models`}
-                                        size="small"
-                                        variant="outlined"
-                                    />
-                                    <Chip
-                                        icon={<DatasetIcon />}
-                                        label={`${project.dataset_count || 0} Datasets`}
-                                        size="small"
-                                        variant="outlined"
-                                    />
-                                    <Chip
-                                        icon={<RequirementIcon />}
-                                        label={`${project.requirement_count || 0} Reqs`}
-                                        size="small"
-                                        variant="outlined"
-                                    />
-                                </Box>
-                            </CardContent>
-
-                            <CardActions sx={{ justifyContent: 'flex-end', px: 2, pb: 2 }}>
-                                <IconButton
-                                    size="small"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        // Edit functionality
-                                    }}
-                                >
-                                    <EditIcon fontSize="small" />
-                                </IconButton>
-                                <IconButton
-                                    size="small"
-                                    color="error"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        if (confirm('Delete this project?')) {
-                                            deleteMutation.mutate(project.id);
-                                        }
-                                    }}
-                                >
-                                    <DeleteIcon fontSize="small" />
-                                </IconButton>
-                            </CardActions>
-                        </Card>
-                    </Grid>
+                        <CardFooter className="border-t border-border/50 bg-muted/30 py-3 flex justify-end gap-2">
+                            <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8 text-muted-foreground hover:text-white"
+                                onClick={(e) => { e.stopPropagation(); /* Edit Logic */ }}
+                            >
+                                <Edit3 className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-500/10"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (confirm('Permanently delete this project?')) {
+                                        deleteMutation.mutate(project.id);
+                                    }
+                                }}
+                            >
+                                <Trash2 className="h-4 w-4" />
+                            </Button>
+                        </CardFooter>
+                    </Card>
                 ))}
 
-                {/* Empty state */}
+                {/* Empty State */}
                 {(!projects || projects.length === 0) && (
-                    <Grid size={{ xs: 12 }}>
-                        <Box
-                            sx={{
-                                textAlign: 'center',
-                                py: 8,
-                                px: 4,
-                                borderRadius: 2,
-                                border: '2px dashed',
-                                borderColor: 'divider',
-                            }}
-                        >
-                            <FolderIcon sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
-                            <Typography variant="h6" color="text.secondary" gutterBottom>
-                                No projects yet
-                            </Typography>
-                            <Typography variant="body2" color="text.disabled" sx={{ mb: 3 }}>
-                                Create your first project to start validating AI models
-                            </Typography>
-                            <Button
-                                variant="contained"
-                                startIcon={<AddIcon />}
-                                onClick={() => setCreateOpen(true)}
-                            >
-                                Create Project
-                            </Button>
-                        </Box>
-                    </Grid>
+                    <div className="col-span-full flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-border py-16 px-4 text-center">
+                        <div className="rounded-full bg-muted p-4 mb-4">
+                            <Folder className="h-8 w-8 text-muted-foreground" />
+                        </div>
+                        <h3 className="text-xl font-semibold">Workspace is empty</h3>
+                        <p className="text-muted-foreground mt-2 max-w-xs mx-auto">
+                            Kickstart your AI evaluation by creating your first project container.
+                        </p>
+                        <Button variant="outline" className="mt-6" onClick={() => setCreateOpen(true)}>
+                            <Plus className="mr-2 h-4 w-4" /> Create Project
+                        </Button>
+                    </div>
                 )}
-            </Grid>
+            </div>
 
             {/* Create Dialog */}
-            <Dialog open={createOpen} onClose={() => setCreateOpen(false)} maxWidth="sm" fullWidth>
-                <DialogTitle>Create New Project</DialogTitle>
-                <DialogContent>
-                    {error && (
-                        <Alert severity="error" sx={{ mb: 2 }}>
-                            {error}
-                        </Alert>
-                    )}
-                    <TextField
-                        autoFocus
-                        label="Project Name"
-                        fullWidth
-                        value={newProject.name}
-                        onChange={(e) => setNewProject({ ...newProject, name: e.target.value })}
-                        sx={{ mt: 1, mb: 2 }}
-                    />
-                    <TextField
-                        label="Description"
-                        fullWidth
-                        multiline
-                        rows={3}
-                        value={newProject.description}
-                        onChange={(e) => setNewProject({ ...newProject, description: e.target.value })}
-                    />
+            <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+                <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                        <DialogTitle>New Project</DialogTitle>
+                        <DialogDescription>
+                            Define the scope of your AI validation environment.
+                        </DialogDescription>
+                    </DialogHeader>
+                    
+                    <div className="grid gap-4 py-4">
+                        {error && (
+                            <Alert variant="destructive" className="py-2">
+                                <AlertDescription>{error}</AlertDescription>
+                            </Alert>
+                        )}
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Name</label>
+                            <Input 
+                                placeholder="e.g. Healthcare LLM Validation" 
+                                value={newProject.name}
+                                onChange={(e) => setNewProject({ ...newProject, name: e.target.value })}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Description</label>
+                            <textarea 
+                                className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                placeholder="What are the goals for this project?"
+                                value={newProject.description}
+                                onChange={(e) => setNewProject({ ...newProject, description: e.target.value })}
+                            />
+                        </div>
+                    </div>
+
+                    <DialogFooter>
+                        <Button variant="ghost" onClick={() => setCreateOpen(false)}>Cancel</Button>
+                        <Button 
+                            className="bg-indigo-600 hover:bg-indigo-700" 
+                            onClick={handleCreate}
+                            disabled={createMutation.isPending}
+                        >
+                            {createMutation.isPending ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : 'Create Project'}
+                        </Button>
+                    </DialogFooter>
                 </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setCreateOpen(false)}>Cancel</Button>
-                    <Button
-                        variant="contained"
-                        onClick={handleCreate}
-                        disabled={createMutation.isPending}
-                    >
-                        {createMutation.isPending ? <CircularProgress size={24} /> : 'Create'}
-                    </Button>
-                </DialogActions>
             </Dialog>
-        </Container>
+        </div>
     );
 }

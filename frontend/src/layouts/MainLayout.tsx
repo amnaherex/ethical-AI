@@ -1,305 +1,175 @@
-// Main layout with sidebar navigation
+import React from 'react';
+import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom';
+import {
+    LayoutDashboard,
+    FolderRoot,
+    ClipboardCheck,
+    FileText,
+    History,
+    Settings,
+    LogOut,
+    User,
+    ShieldCheck,
+    Menu as MenuIcon
+} from "lucide-react";
 
-import React, { useState } from 'react';
-import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import {
-    Box,
-    Drawer,
-    AppBar,
-    Toolbar,
-    List,
-    ListItem,
-    ListItemButton,
-    ListItemIcon,
-    ListItemText,
-    Typography,
-    IconButton,
-    Avatar,
-    Menu,
-    MenuItem,
-    Divider,
-    useTheme,
-    useMediaQuery,
-} from '@mui/material';
-import {
-    Dashboard as DashboardIcon,
-    Folder as FolderIcon,
-    Assessment as AssessmentIcon,
-    Description as DescriptionIcon,
-    History as HistoryIcon,
-    Settings as SettingsIcon,
-    Menu as MenuIcon,
-    Security as SecurityIcon,
-    Logout as LogoutIcon,
-    Person as PersonIcon,
-} from '@mui/icons-material';
+import { cn } from "../lib/utils";
 import { useAuth } from '../contexts/AuthContext';
-
-const DRAWER_WIDTH = 260;
+import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
+import { Button } from "../components/ui/button";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "../components/ui/dropdown-menu";
+import {
+    Sidebar,
+    SidebarContent,
+    SidebarFooter,
+    SidebarHeader,
+    SidebarMenu,
+    SidebarMenuButton,
+    SidebarMenuItem,
+    SidebarProvider,
+    SidebarTrigger,
+    SidebarRail,
+} from "../components/ui/sidebar";
 
 const menuItems = [
-    { text: 'Dashboard', icon: DashboardIcon, path: '/dashboard' },
-    { text: 'Projects', icon: FolderIcon, path: '/projects' },
-    { text: 'Validations', icon: AssessmentIcon, path: '/validations' },
-    { text: 'Templates', icon: DescriptionIcon, path: '/templates' },
-    { text: 'Audit Log', icon: HistoryIcon, path: '/audit' },
+    { text: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
+    { text: 'Projects', icon: FolderRoot, path: '/projects' },
+    { text: 'Validations', icon: ClipboardCheck, path: '/validations' },
+    { text: 'Templates', icon: FileText, path: '/templates' },
+    { text: 'Audit Log', icon: History, path: '/audit' },
 ];
 
 export default function MainLayout() {
-    const theme = useTheme();
-    const isMobile = useMediaQuery(theme.breakpoints.down('md'));
     const navigate = useNavigate();
     const location = useLocation();
     const { user, logout } = useAuth();
-
-    const [mobileOpen, setMobileOpen] = useState(false);
-    const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-
-    const handleDrawerToggle = () => {
-        setMobileOpen(!mobileOpen);
-    };
-
-    const handleProfileMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
-        setAnchorEl(event.currentTarget);
-    };
-
-    const handleProfileMenuClose = () => {
-        setAnchorEl(null);
-    };
 
     const handleLogout = () => {
         logout();
         navigate('/login');
     };
 
-    const drawer = (
-        <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-            {/* Logo */}
-            <Box sx={{ p: 3, display: 'flex', alignItems: 'center' }}>
-                <Box
-                    sx={{
-                        width: 40,
-                        height: 40,
-                        borderRadius: 1.5,
-                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        mr: 1.5,
-                    }}
-                >
-                    <SecurityIcon sx={{ color: 'white', fontSize: 24 }} />
-                </Box>
-                <Box>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
-                        Ethical AI
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                        Platform
-                    </Typography>
-                </Box>
-            </Box>
-
-            <Divider sx={{ borderColor: 'rgba(255,255,255,0.08)' }} />
-
-            {/* Navigation */}
-            <List sx={{ px: 2, flex: 1 }}>
-                {menuItems.map((item) => {
-                    const isActive = location.pathname === item.path;
-                    return (
-                        <ListItem key={item.text} disablePadding sx={{ mb: 0.5 }}>
-                            <ListItemButton
-                                onClick={() => {
-                                    navigate(item.path);
-                                    if (isMobile) setMobileOpen(false);
-                                }}
-                                sx={{
-                                    borderRadius: 2,
-                                    backgroundColor: isActive ? 'rgba(102, 126, 234, 0.15)' : 'transparent',
-                                    '&:hover': {
-                                        backgroundColor: isActive
-                                            ? 'rgba(102, 126, 234, 0.2)'
-                                            : 'rgba(255, 255, 255, 0.05)',
-                                    },
-                                }}
-                            >
-                                <ListItemIcon
-                                    sx={{
-                                        minWidth: 40,
-                                        color: isActive ? 'primary.main' : 'text.secondary',
-                                    }}
-                                >
-                                    <item.icon />
-                                </ListItemIcon>
-                                <ListItemText
-                                    primary={item.text}
-                                    primaryTypographyProps={{
-                                        fontWeight: isActive ? 600 : 400,
-                                        color: isActive ? 'text.primary' : 'text.secondary',
-                                    }}
-                                />
-                            </ListItemButton>
-                        </ListItem>
-                    );
-                })}
-            </List>
-
-            {/* User Info */}
-            <Divider sx={{ borderColor: 'rgba(255,255,255,0.08)' }} />
-            <Box sx={{ p: 2 }}>
-                <Box
-                    sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        p: 1.5,
-                        borderRadius: 2,
-                        backgroundColor: 'rgba(255, 255, 255, 0.03)',
-                    }}
-                >
-                    <Avatar
-                        sx={{
-                            width: 36,
-                            height: 36,
-                            bgcolor: 'primary.main',
-                            fontSize: '0.875rem',
-                        }}
-                    >
-                        {user?.name?.charAt(0) || 'U'}
-                    </Avatar>
-                    <Box sx={{ ml: 1.5, overflow: 'hidden' }}>
-                        <Typography variant="body2" sx={{ fontWeight: 500 }} noWrap>
-                            {user?.name || 'User'}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary" noWrap>
-                            {user?.role || 'user'}
-                        </Typography>
-                    </Box>
-                </Box>
-            </Box>
-        </Box>
-    );
-
     return (
-        <Box sx={{ display: 'flex', minHeight: '100vh' }}>
-            {/* App Bar */}
-            <AppBar
-                position="fixed"
-                sx={{
-                    width: { md: `calc(100% - ${DRAWER_WIDTH}px)` },
-                    ml: { md: `${DRAWER_WIDTH}px` },
-                }}
-            >
-                <Toolbar>
-                    <IconButton
-                        color="inherit"
-                        edge="start"
-                        onClick={handleDrawerToggle}
-                        sx={{ mr: 2, display: { md: 'none' } }}
-                    >
-                        <MenuIcon />
-                    </IconButton>
+        <SidebarProvider>
+            <div className="flex min-h-screen w-full bg-background">
+                {/* --- SIDEBAR --- */}
+                <Sidebar collapsible="icon" className="border-r border-white/5">
+                    <SidebarHeader className="p-4">
+                        <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#667eea] to-[#764ba2] shadow-glow">
+                                <ShieldCheck className="h-6 w-6 text-white" />
+                            </div>
+                            <div className="flex flex-col overflow-hidden transition-all data-[collapsible=icon]:w-0">
+                                <span className="text-sm font-bold leading-none tracking-tight">Ethical AI</span>
+                                <span className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1">Platform</span>
+                            </div>
+                        </div>
+                    </SidebarHeader>
 
-                    <Box sx={{ flexGrow: 1 }} />
+                    <SidebarContent className="px-2 mt-4">
+                        <SidebarMenu>
+                            {menuItems.map((item) => {
+                                const isActive = location.pathname === item.path;
+                                return (
+                                    <SidebarMenuItem key={item.text}>
+                                        <SidebarMenuButton
+                                            asChild
+                                            isActive={isActive}
+                                            tooltip={item.text}
+                                            className={cn(
+                                                "transition-all duration-200 h-11",
+                                                isActive ? "bg-primary/10 text-primary hover:bg-primary/15" : "hover:bg-white/5"
+                                            )}
+                                        >
+                                            <Link to={item.path} className="flex items-center gap-3">
+                                                <item.icon className={cn("h-5 w-5", isActive ? "text-primary" : "text-muted-foreground")} />
+                                                <span className="font-medium">{item.text}</span>
+                                            </Link>
+                                        </SidebarMenuButton>
+                                    </SidebarMenuItem>
+                                );
+                            })}
+                        </SidebarMenu>
+                    </SidebarContent>
 
-                    <IconButton
-                        onClick={handleProfileMenuOpen}
-                        sx={{ p: 0 }}
-                    >
-                        <Avatar
-                            sx={{
-                                width: 36,
-                                height: 36,
-                                bgcolor: 'primary.main',
-                            }}
-                        >
-                            {user?.name?.charAt(0) || 'U'}
-                        </Avatar>
-                    </IconButton>
+                    <SidebarFooter className="p-4 border-t border-white/5">
+                        <SidebarMenu>
+                            <SidebarMenuItem>
+                                <div className="flex items-center gap-3 p-2 rounded-lg bg-white/5 overflow-hidden">
+                                    <Avatar className="h-9 w-9 border border-white/10">
+                                        <AvatarFallback className="bg-primary text-[10px] text-white">
+                                            {user?.name?.charAt(0) || 'U'}
+                                        </AvatarFallback>
+                                    </Avatar>
+                                    <div className="flex flex-col min-w-0">
+                                        <span className="text-xs font-semibold truncate">{user?.name || 'User'}</span>
+                                        <span className="text-[10px] text-muted-foreground capitalize">{user?.role || 'user'}</span>
+                                    </div>
+                                </div>
+                            </SidebarMenuItem>
+                        </SidebarMenu>
+                    </SidebarFooter>
+                    <SidebarRail />
+                </Sidebar>
 
-                    <Menu
-                        anchorEl={anchorEl}
-                        open={Boolean(anchorEl)}
-                        onClose={handleProfileMenuClose}
-                        PaperProps={{
-                            sx: {
-                                mt: 1.5,
-                                minWidth: 180,
-                            },
-                        }}
-                    >
-                        <MenuItem onClick={() => { handleProfileMenuClose(); navigate('/profile'); }}>
-                            <ListItemIcon>
-                                <PersonIcon fontSize="small" />
-                            </ListItemIcon>
-                            Profile
-                        </MenuItem>
-                        <MenuItem onClick={() => { handleProfileMenuClose(); navigate('/settings'); }}>
-                            <ListItemIcon>
-                                <SettingsIcon fontSize="small" />
-                            </ListItemIcon>
-                            Settings
-                        </MenuItem>
-                        <Divider />
-                        <MenuItem onClick={handleLogout}>
-                            <ListItemIcon>
-                                <LogoutIcon fontSize="small" />
-                            </ListItemIcon>
-                            Logout
-                        </MenuItem>
-                    </Menu>
-                </Toolbar>
-            </AppBar>
+                {/* --- MAIN PAGE AREA --- */}
+                <div className="flex flex-1 flex-col">
+                    {/* Header/Nav Bar */}
+                    <header className="flex h-16 items-center justify-between border-b border-white/5 bg-background/50 backdrop-blur-md px-6 sticky top-0 z-10">
+                        <SidebarTrigger className="hover:bg-white/5" />
+                        
+                        <div className="flex items-center gap-4">
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" className="relative h-9 w-9 rounded-full">
+                                        <Avatar className="h-9 w-9 border border-white/10 hover:border-primary/50 transition-colors">
+                                            <AvatarFallback className="bg-secondary text-xs">
+                                                {user?.name?.charAt(0) || 'U'}
+                                            </AvatarFallback>
+                                        </Avatar>
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent className="w-56" align="end" forceMount>
+                                    <DropdownMenuLabel className="font-normal">
+                                        <div className="flex flex-col space-y-1">
+                                            <p className="text-sm font-medium leading-none">{user?.name}</p>
+                                            <p className="text-xs leading-none text-muted-foreground">{user?.email || "user@example.com"}</p>
+                                        </div>
+                                    </DropdownMenuLabel>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={() => navigate('/profile')}>
+                                        <User className="mr-2 h-4 w-4" />
+                                        <span>Profile</span>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => navigate('/settings')}>
+                                        <Settings className="mr-2 h-4 w-4" />
+                                        <span>Settings</span>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:bg-destructive/10">
+                                        <LogOut className="mr-2 h-4 w-4" />
+                                        <span>Log out</span>
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        </div>
+                    </header>
 
-            {/* Sidebar */}
-            <Box
-                component="nav"
-                sx={{ width: { md: DRAWER_WIDTH }, flexShrink: { md: 0 } }}
-            >
-                {/* Mobile drawer */}
-                <Drawer
-                    variant="temporary"
-                    open={mobileOpen}
-                    onClose={handleDrawerToggle}
-                    ModalProps={{ keepMounted: true }}
-                    sx={{
-                        display: { xs: 'block', md: 'none' },
-                        '& .MuiDrawer-paper': {
-                            boxSizing: 'border-box',
-                            width: DRAWER_WIDTH,
-                        },
-                    }}
-                >
-                    {drawer}
-                </Drawer>
-
-                {/* Desktop drawer */}
-                <Drawer
-                    variant="permanent"
-                    sx={{
-                        display: { xs: 'none', md: 'block' },
-                        '& .MuiDrawer-paper': {
-                            boxSizing: 'border-box',
-                            width: DRAWER_WIDTH,
-                        },
-                    }}
-                    open
-                >
-                    {drawer}
-                </Drawer>
-            </Box>
-
-            {/* Main Content */}
-            <Box
-                component="main"
-                sx={{
-                    flexGrow: 1,
-                    width: { md: `calc(100% - ${DRAWER_WIDTH}px)` },
-                    minHeight: '100vh',
-                    pt: 8,
-                }}
-            >
-                <Outlet />
-            </Box>
-        </Box>
+                    {/* Content Viewport */}
+                    <main className="flex-1 overflow-y-auto p-6">
+                        <div className="mx-auto max-w-7xl animate-fade-in">
+                            <Outlet />
+                        </div>
+                    </main>
+                </div>
+            </div>
+        </SidebarProvider>
     );
 }
