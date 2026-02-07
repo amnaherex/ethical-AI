@@ -1,20 +1,22 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import {
-    ArrowLeft as BackIcon,
-    Scale as FairnessIcon,
-    Eye as TransparencyIcon,
-    Lock as PrivacyIcon,
-    ClipboardList as AccountabilityIcon,
-    CheckCircle as CheckIcon,
-    XCircle as FailIcon,
-    Play as RunIcon,
-    RefreshCw as RefreshIcon,
-} from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
+import {
+    ArrowLeft,
+    Scale,
+    Eye,
+    Lock,
+    ClipboardList,
+    CheckCircle,
+    XCircle,
+    Play,
+    RefreshCw,
+    AlertTriangle,
+} from 'lucide-react';
 import { modelsApi, datasetsApi, validationApi } from '../services/api';
+
 import { Button } from '../components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import {
     Select,
     SelectContent,
@@ -206,15 +208,16 @@ export default function ValidationPage() {
             {/* Warning Dialog for Missing Target Column */}
             <Dialog
                 open={showWarningDialog}
-                onOpenChange={(open:boolean) => {
+                onOpenChange={(open) => {
                     setShowWarningDialog(open);
                     if (!open) setPendingSubmit(false);
                 }}
             >
                 <DialogContent className="sm:max-w-[525px]">
                     <DialogHeader>
-                        <DialogTitle className="text-yellow-600">
-                            ⚠️ Warning: No Target Column Specified
+                        <DialogTitle className="flex items-center gap-2 text-yellow-600">
+                            <AlertTriangle className="h-5 w-5" />
+                            Warning: No Target Column Specified
                         </DialogTitle>
                         <DialogDescription className="space-y-4 pt-4">
                             <p>
@@ -222,7 +225,7 @@ export default function ValidationPage() {
                             </p>
                             <div>
                                 <p className="font-semibold mb-2">This means:</p>
-                                <ul className="list-disc pl-5 space-y-2">
+                                <ul className="list-disc pl-5 space-y-1.5">
                                     <li>
                                         The fairness analysis will check if the model's predictions are <strong>internally consistent</strong> across groups
                                     </li>
@@ -264,7 +267,7 @@ export default function ValidationPage() {
                 </DialogContent>
             </Dialog>
 
-            <div className="container max-w-7xl mx-auto py-8 px-4">
+            <div className="container mx-auto max-w-7xl py-8 px-4">
                 {/* Header */}
                 <div className="flex items-center mb-8">
                     <Button
@@ -273,210 +276,193 @@ export default function ValidationPage() {
                         onClick={() => navigate(`/projects/${id}`)}
                         className="mr-4"
                     >
-                        <BackIcon className="h-5 w-5" />
+                        <ArrowLeft className="h-5 w-5" />
                     </Button>
-                    <h1 className="text-4xl font-bold">
-                        Ethical AI Validation Suite
-                    </h1>
+                    <h1 className="text-4xl font-bold">Ethical AI Validation Suite</h1>
                 </div>
 
                 {error && (
                     <Alert variant="destructive" className="mb-6">
                         <AlertTitle>Error</AlertTitle>
-                        <AlertDescription>{error}</AlertDescription>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            className="absolute top-2 right-2"
-                            onClick={() => setError('')}
-                        >
-                            ×
-                        </Button>
+                        <AlertDescription className="flex items-center justify-between">
+                            <span>{error}</span>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setError('')}
+                            >
+                                ✕
+                            </Button>
+                        </AlertDescription>
                     </Alert>
                 )}
 
                 {/* Configuration Form */}
                 {!isRunning && !results && (
                     <Card className="mb-6">
-                        <CardContent className="p-8">
-                            <h2 className="text-xl font-semibold mb-2">
-                                Configure Validation Suite
-                            </h2>
-                            <p className="text-sm text-muted-foreground mb-6">
+                        <CardHeader>
+                            <CardTitle>Configure Validation Suite</CardTitle>
+                            <CardDescription>
                                 This will run all 4 ethical validations: Fairness, Transparency, Privacy, and Accountability
-                            </p>
-
-                            <div className="space-y-6">
-                                {/* Row 1 */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    {/* Model Selection */}
-                                    <div className="space-y-2">
-                                        <Label htmlFor="model-select">Model</Label>
-                                        <Select value={selectedModel} onValueChange={setSelectedModel}>
-                                            <SelectTrigger id="model-select">
-                                                <SelectValue placeholder="Select a model" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {models?.map((model: any) => (
-                                                    <SelectItem key={model.id} value={model.id}>
-                                                        {model.name} ({model.model_type})
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-
-                                    {/* Dataset Selection */}
-                                    <div className="space-y-2">
-                                        <Label htmlFor="dataset-select">Dataset</Label>
-                                        <Select value={selectedDataset} onValueChange={setSelectedDataset}>
-                                            <SelectTrigger id="dataset-select">
-                                                <SelectValue placeholder="Select a dataset" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {datasets?.map((dataset: any) => (
-                                                    <SelectItem key={dataset.id} value={dataset.id}>
-                                                        {dataset.name} ({dataset.row_count} rows)
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                </div>
-
-                                {/* Row 2 */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    {/* Sensitive Feature */}
-                                    <div className="space-y-2">
-                                        <Label htmlFor="sensitive-feature">Sensitive Feature (for Fairness)</Label>
-                                        <Select
-                                            value={sensitiveFeature}
-                                            onValueChange={setSensitiveFeature}
-                                            disabled={!selectedDataset}
-                                        >
-                                            <SelectTrigger id="sensitive-feature">
-                                                <SelectValue placeholder="Select sensitive feature" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {selectedDatasetObj?.columns?.map((col: string) => (
-                                                    <SelectItem key={col} value={col}>
-                                                        {col}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-
-                                    {/* Target Column */}
-                                    <div className="space-y-2">
-                                        <Label htmlFor="target-column">Target Column (Optional)</Label>
-                                        <Select
-                                            value={targetColumn}
-                                            onValueChange={setTargetColumn}
-                                            disabled={!selectedDataset}
-                                        >
-                                            <SelectTrigger id="target-column">
-                                                <SelectValue placeholder="None - Use model predictions" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="">
-                                                    None - Use model predictions
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            {/* Row 1 */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {/* Model Selection */}
+                                <div className="space-y-2">
+                                    <Label htmlFor="model">Model</Label>
+                                    <Select value={selectedModel} onValueChange={setSelectedModel}>
+                                        <SelectTrigger id="model">
+                                            <SelectValue placeholder="Select a model" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {models?.map((model: any) => (
+                                                <SelectItem key={model.id} value={model.id}>
+                                                    {model.name} ({model.model_type})
                                                 </SelectItem>
-                                                {selectedDatasetObj?.columns?.map((col: string) => (
-                                                    <SelectItem key={col} value={col}>
-                                                        {col}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                        {!targetColumn && (
-                                            <p className="text-xs text-yellow-600 mt-1 ml-1">
-                                                ⚠️ Without target column, fairness will be checked using model predictions
-                                            </p>
-                                        )}
-                                    </div>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
                                 </div>
 
-                                {/* Row 3 */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    {/* Quasi Identifiers */}
-                                    <div className="space-y-2">
-                                        <Label htmlFor="quasi-identifiers">Quasi-Identifiers (Optional, for Privacy)</Label>
-                                        <div className="space-y-2">
-                                            <Select
-                                                value=""
-                                                onValueChange={(value: string) => {
-                                                    if (value && !quasiIdentifiers.includes(value)) {
-                                                        setQuasiIdentifiers([...quasiIdentifiers, value]);
-                                                    }
-                                                }}
-                                                disabled={!selectedDataset}
-                                            >
-                                                <SelectTrigger id="quasi-identifiers">
-                                                    <SelectValue placeholder="Select quasi-identifiers" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    {selectedDatasetObj?.columns?.map((col: string) => (
-                                                        <SelectItem 
-                                                            key={col} 
-                                                            value={col}
-                                                            disabled={quasiIdentifiers.includes(col)}
-                                                        >
-                                                            {col} {quasiIdentifiers.includes(col) && '✓'}
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                            {quasiIdentifiers.length > 0 && (
-                                                <div className="flex flex-wrap gap-1">
-                                                    {quasiIdentifiers.map((value) => (
-                                                        <Badge 
-                                                            key={value} 
-                                                            variant="secondary" 
-                                                            className="text-xs cursor-pointer"
-                                                            onClick={() => {
-                                                                setQuasiIdentifiers(quasiIdentifiers.filter(id => id !== value));
-                                                            }}
-                                                        >
-                                                            {value} ×
-                                                        </Badge>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {/* Sensitive Attribute */}
-                                    <div className="space-y-2">
-                                        <Label htmlFor="sensitive-attribute">Sensitive Attribute (Optional, for Privacy)</Label>
-                                        <Select
-                                            value={sensitiveAttribute}
-                                            onValueChange={setSensitiveAttribute}
-                                            disabled={!selectedDataset}
-                                        >
-                                            <SelectTrigger id="sensitive-attribute">
-                                                <SelectValue placeholder="None" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="">None</SelectItem>
-                                                {selectedDatasetObj?.columns?.map((col: string) => (
-                                                    <SelectItem key={col} value={col}>
-                                                        {col}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
+                                {/* Dataset Selection */}
+                                <div className="space-y-2">
+                                    <Label htmlFor="dataset">Dataset</Label>
+                                    <Select value={selectedDataset} onValueChange={setSelectedDataset}>
+                                        <SelectTrigger id="dataset">
+                                            <SelectValue placeholder="Select a dataset" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {datasets?.map((dataset: any) => (
+                                                <SelectItem key={dataset.id} value={dataset.id}>
+                                                    {dataset.name} ({dataset.row_count} rows)
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
                                 </div>
                             </div>
 
-                            <div className="mt-8 flex justify-end">
+                            {/* Row 2 */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {/* Sensitive Feature */}
+                                <div className="space-y-2">
+                                    <Label htmlFor="sensitive-feature">Sensitive Feature (for Fairness)</Label>
+                                    <Select
+                                        value={sensitiveFeature}
+                                        onValueChange={setSensitiveFeature}
+                                        disabled={!selectedDataset}
+                                    >
+                                        <SelectTrigger id="sensitive-feature">
+                                            <SelectValue placeholder="Select sensitive feature" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {selectedDatasetObj?.columns?.map((col: string) => (
+                                                <SelectItem key={col} value={col}>
+                                                    {col}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                {/* Target Column */}
+                                <div className="space-y-2">
+                                    <Label htmlFor="target-column">Target Column (Optional)</Label>
+                                    <Select
+                                        value={targetColumn || "__none__"}
+                                        onValueChange={(val) => setTargetColumn(val === "__none__" ? "" : val)}
+                                        disabled={!selectedDataset}
+                                    >
+                                        <SelectTrigger id="target-column">
+                                            <SelectValue placeholder="None - Use model predictions" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="__none__">
+                                                <em>None - Use model predictions</em>
+                                            </SelectItem>
+                                            {selectedDatasetObj?.columns?.map((col: string) => (
+                                                <SelectItem key={col} value={col}>
+                                                    {col}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    {!targetColumn && (
+                                        <p className="text-xs text-yellow-600 mt-1 flex items-center gap-1">
+                                            <AlertTriangle className="h-3 w-3" />
+                                            Without target column, fairness will be checked using model predictions
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Row 3 */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {/* Quasi Identifiers */}
+                                <div className="space-y-2">
+                                    <Label htmlFor="quasi-identifiers">Quasi-Identifiers (Optional, for Privacy)</Label>
+                                    <Select
+                                        value={quasiIdentifiers.join(',')}
+                                        onValueChange={(value) => setQuasiIdentifiers(value ? value.split(',') : [])}
+                                        disabled={!selectedDataset}
+                                    >
+                                        <SelectTrigger id="quasi-identifiers">
+                                            <SelectValue placeholder="Select quasi-identifiers">
+                                                {quasiIdentifiers.length > 0 ? (
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {quasiIdentifiers.map((value) => (
+                                                            <Badge key={value} variant="secondary" className="text-xs">
+                                                                {value}
+                                                            </Badge>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    "Select quasi-identifiers"
+                                                )}
+                                            </SelectValue>
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {selectedDatasetObj?.columns?.map((col: string) => (
+                                                <SelectItem key={col} value={col}>
+                                                    {col}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                {/* Sensitive Attribute */}
+                                <div className="space-y-2">
+                                    <Label htmlFor="sensitive-attribute">Sensitive Attribute (Optional, for Privacy)</Label>
+                                    <Select
+                                        value={sensitiveAttribute || "__none__"}
+                                        onValueChange={(val) => setSensitiveAttribute(val === "__none__" ? "" : val)}
+                                        disabled={!selectedDataset}
+                                    >
+                                        <SelectTrigger id="sensitive-attribute">
+                                            <SelectValue placeholder="None" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="__none__">None</SelectItem>
+                                            {selectedDatasetObj?.columns?.map((col: string) => (
+                                                <SelectItem key={col} value={col}>
+                                                    {col}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+
+                            <div className="flex justify-end pt-4">
                                 <Button
                                     size="lg"
                                     onClick={handleRunAllValidations}
                                     disabled={!selectedModel || !selectedDataset || !sensitiveFeature}
                                 >
-                                    <RunIcon className="mr-2 h-4 w-4" />
+                                    <Play className="mr-2 h-4 w-4" />
                                     Run All Validations
                                 </Button>
                             </div>
@@ -487,9 +473,9 @@ export default function ValidationPage() {
                 {/* Progress Indicator */}
                 {isRunning && (
                     <Card className="mb-6">
-                        <CardContent className="p-8">
+                        <CardContent className="pt-6">
                             <div className="flex items-center mb-4">
-                                <Loader2 className="mr-4 h-6 w-6 animate-spin" />
+                                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                                 <h2 className="text-xl font-semibold">Running Validations...</h2>
                             </div>
                             <Progress value={progress} className="mb-4 h-2" />
@@ -505,11 +491,11 @@ export default function ValidationPage() {
                     <div>
                         <Alert className={`mb-6 ${results.overall_passed ? 'border-green-500 bg-green-50' : 'border-yellow-500 bg-yellow-50'}`}>
                             {results.overall_passed ? (
-                                <CheckIcon className="h-5 w-5 text-green-600" />
+                                <CheckCircle className="h-5 w-5 text-green-600" />
                             ) : (
-                                <FailIcon className="h-5 w-5 text-yellow-600" />
+                                <XCircle className="h-5 w-5 text-yellow-600" />
                             )}
-                            <AlertTitle className="text-lg">
+                            <AlertTitle className="text-lg font-semibold">
                                 Validation Suite {results.overall_passed ? 'Passed' : 'Failed'}
                             </AlertTitle>
                             <AlertDescription>
@@ -518,11 +504,12 @@ export default function ValidationPage() {
                         </Alert>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* Fairness Validation */}
                             {results.validations?.fairness && (
                                 <Card>
-                                    <CardContent className="p-6">
+                                    <CardContent className="pt-6">
                                         <div className="flex items-center mb-4">
-                                            <FairnessIcon className="h-8 w-8 text-green-600 mr-4" />
+                                            <Scale className="h-8 w-8 text-green-600 mr-3" />
                                             <div className="flex-1">
                                                 <h3 className="text-lg font-semibold">Fairness Validation</h3>
                                                 <Badge
@@ -540,10 +527,10 @@ export default function ValidationPage() {
                                         {/* Display detailed metrics if available */}
                                         {results.validations.fairness.results && results.validations.fairness.results.length > 0 && (
                                             <div className="mt-4">
-                                                <p className="text-sm font-semibold mb-2">Metrics:</p>
+                                                <h4 className="text-sm font-semibold mb-2">Metrics:</h4>
                                                 {results.validations.fairness.results.map((metric: any, idx: number) => (
                                                     <div key={idx} className="flex justify-between items-center mb-2">
-                                                        <span className="text-xs">
+                                                        <span className="text-sm">
                                                             {metric.metric_name.replace(/_/g, ' ')}
                                                         </span>
                                                         <div className="flex gap-2 items-center">
@@ -552,7 +539,7 @@ export default function ValidationPage() {
                                                             </span>
                                                             <Badge
                                                                 variant={metric.passed ? 'default' : 'destructive'}
-                                                                className="min-w-[30px] h-5 text-xs"
+                                                                className="min-w-[30px] h-5"
                                                             >
                                                                 {metric.passed ? '✓' : '✗'}
                                                             </Badge>
@@ -571,11 +558,12 @@ export default function ValidationPage() {
                                 </Card>
                             )}
 
+                            {/* Transparency Validation */}
                             {results.validations?.transparency && (
                                 <Card>
-                                    <CardContent className="p-6">
+                                    <CardContent className="pt-6">
                                         <div className="flex items-center mb-4">
-                                            <TransparencyIcon className="h-8 w-8 text-blue-600 mr-4" />
+                                            <Eye className="h-8 w-8 text-blue-600 mr-3" />
                                             <div className="flex-1">
                                                 <h3 className="text-lg font-semibold">Transparency Validation</h3>
                                                 <Badge
@@ -594,16 +582,16 @@ export default function ValidationPage() {
                                         {/* Feature Importance */}
                                         {results.validations.transparency.global_importance && (
                                             <div className="mt-4">
-                                                <p className="text-sm font-bold mb-2">
+                                                <h4 className="text-sm font-semibold mb-2">
                                                     Top Feature Importances:
-                                                </p>
+                                                </h4>
                                                 {Object.entries(results.validations.transparency.global_importance)
                                                     .sort(([, a]: any, [, b]: any) => b - a)
                                                     .slice(0, 5)
                                                     .map(([feature, importance]: any) => (
                                                         <div key={feature} className="flex justify-between mb-1">
                                                             <span className="text-xs">{feature}:</span>
-                                                            <span className="text-xs font-bold">
+                                                            <span className="text-xs font-semibold">
                                                                 {(importance * 100).toFixed(2)}%
                                                             </span>
                                                         </div>
@@ -614,9 +602,9 @@ export default function ValidationPage() {
                                         {/* Model Card Metrics */}
                                         {results.validations.transparency.model_card?.performance_metrics && (
                                             <div className="mt-4">
-                                                <p className="text-sm font-bold mb-2">
+                                                <h4 className="text-sm font-semibold mb-2">
                                                     Model Performance:
-                                                </p>
+                                                </h4>
                                                 <div className="flex flex-wrap gap-2">
                                                     {Object.entries(results.validations.transparency.model_card.performance_metrics).map(([metric, value]: any) => (
                                                         <Badge
@@ -647,11 +635,12 @@ export default function ValidationPage() {
                                 </Card>
                             )}
 
+                            {/* Privacy Validation */}
                             {results.validations?.privacy && (
                                 <Card>
-                                    <CardContent className="p-6">
+                                    <CardContent className="pt-6">
                                         <div className="flex items-center mb-4">
-                                            <PrivacyIcon className="h-8 w-8 text-orange-600 mr-4" />
+                                            <Lock className="h-8 w-8 text-orange-600 mr-3" />
                                             <div className="flex-1">
                                                 <h3 className="text-lg font-semibold">Privacy Validation</h3>
                                                 <Badge
@@ -670,9 +659,9 @@ export default function ValidationPage() {
                                         {/* PII Detection */}
                                         {results.validations.privacy.pii_detected && (
                                             <div className="mt-4">
-                                                <p className="text-sm font-bold mb-2">
+                                                <h4 className="text-sm font-semibold mb-2">
                                                     PII Detection:
-                                                </p>
+                                                </h4>
                                                 <p className={`text-sm ${results.validations.privacy.pii_detected.length > 0 ? 'text-red-600' : 'text-green-600'}`}>
                                                     {results.validations.privacy.pii_detected.length > 0 
                                                         ? `⚠️ ${results.validations.privacy.pii_detected.length} column(s) with PII detected`
@@ -693,9 +682,9 @@ export default function ValidationPage() {
                                         {/* k-Anonymity */}
                                         {results.validations.privacy.k_anonymity && (
                                             <div className="mt-4">
-                                                <p className="text-sm font-bold mb-2">
+                                                <h4 className="text-sm font-semibold mb-2">
                                                     k-Anonymity (k={results.validations.privacy.k_anonymity.k_value}):
-                                                </p>
+                                                </h4>
                                                 <Badge
                                                     variant={results.validations.privacy.k_anonymity.satisfies_k ? 'default' : 'destructive'}
                                                     className="mb-2"
@@ -714,9 +703,9 @@ export default function ValidationPage() {
                                         {/* l-Diversity */}
                                         {results.validations.privacy.l_diversity && (
                                             <div className="mt-4">
-                                                <p className="text-sm font-bold mb-2">
+                                                <h4 className="text-sm font-semibold mb-2">
                                                     l-Diversity (l={results.validations.privacy.l_diversity.l_value}):
-                                                </p>
+                                                </h4>
                                                 <Badge
                                                     variant={results.validations.privacy.l_diversity.satisfies_l ? 'default' : 'destructive'}
                                                     className="mb-2"
@@ -733,8 +722,8 @@ export default function ValidationPage() {
                                         )}
 
                                         {/* Overall Status */}
-                                        <div className={`mt-4 p-3 rounded-md ${results.validations.privacy.overall_passed ? 'bg-green-100' : 'bg-red-100'}`}>
-                                            <p className="text-sm font-bold">
+                                        <div className={`mt-4 p-3 rounded ${results.validations.privacy.overall_passed ? 'bg-green-100' : 'bg-red-100'}`}>
+                                            <p className="text-sm font-semibold">
                                                 {results.validations.privacy.overall_passed ? '✓ Privacy Validated' : '⚠️ Privacy Issues Found'}
                                             </p>
                                         </div>
@@ -758,9 +747,9 @@ export default function ValidationPage() {
 
                             {/* Accountability */}
                             <Card>
-                                <CardContent className="p-6">
+                                <CardContent className="pt-6">
                                     <div className="flex items-center mb-4">
-                                        <AccountabilityIcon className="h-8 w-8 text-purple-600 mr-4" />
+                                        <ClipboardList className="h-8 w-8 text-purple-600 mr-3" />
                                         <div className="flex-1">
                                             <h3 className="text-lg font-semibold">Accountability Tracking</h3>
                                             <Badge variant="default" className="mt-1">
@@ -783,7 +772,7 @@ export default function ValidationPage() {
                                 Back to Project
                             </Button>
                             <Button onClick={handleReset}>
-                                <RefreshIcon className="mr-2 h-4 w-4" />
+                                <RefreshCw className="mr-2 h-4 w-4" />
                                 Run Another Validation
                             </Button>
                         </div>

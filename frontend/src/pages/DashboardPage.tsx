@@ -6,7 +6,6 @@ import {
     Folder, 
     BarChart3, 
     CheckCircle2, 
-    AlertCircle, 
     TrendingUp, 
     Clock, 
     ShieldCheck, 

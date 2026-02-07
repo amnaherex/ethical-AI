@@ -71,13 +71,13 @@
             {/* Left Side: Brand Panel (approx 45%) */}
             <div className='hidden lg:flex w-[45%] h-full bg-radial-[at_50%_89%] from-sky-200 via-blue-600 to-indigo-900 items-center justify-between flex-col text-white p-12 rounded-xl shadow-inner'>
                 <div className='flex flex-col items-center text-center gap-6 mt-20'>
-                    <h1 className='text-6xl font-bold tracking-tight'>Welcome To Ethical AI</h1>
+                    <h1 className='text-6xl font-bold'>Ethical AI</h1>
                     <h4 className='text-xl text-sky-100 opacity-90'>Engineering Trust into Every Prediction</h4>
                 </div>
 
                 {/* Bottom Glass Card */}
-                <div className='glass-card p-8 mb-10 text-center max-w-md'>
-                    <p className='font-medium leading-relaxed'>
+                <div className='glass-card p-8 mb-15 text-center max-w-md'>
+                    <p className='font-medium '>
                         The comprehensive Ethical AI Requirements Engineering Platform.
                         Validate your models for fairness, transparency, and privacy ensuring accountability from development to deployment.
                     </p>
@@ -86,10 +86,11 @@
 
             {/* Right Side: Login Form (approx 55%) */}
             <div className='flex-1 h-full flex items-center justify-center p-4'>
+
                 <Card className='w-full max-w-[500px] border-none shadow-2xl py-8'>
-                    <CardHeader className="space-y-1 text-center">
-                        <CardTitle className='text-3xl font-bold tracking-tight'>Welcome Back!</CardTitle>
-                        <CardDescription className='text-muted-foreground'>
+                    <CardHeader className="space-y-1">
+                           <CardTitle className='text-3xl'>Welcome Back!</CardTitle>
+                        <CardDescription>
                             Add Your Details To Login
                         </CardDescription>
                     </CardHeader>
@@ -117,10 +118,10 @@
                             <div className="space-y-2">
                                 <div className="flex justify-between items-center">
                                     <Label htmlFor="Password">Password</Label>
-                                    <Link to="#" className="text-xs text-blue-600 hover:underline">Forgot Password?</Link>
                                 </div>
                                 <div className='relative'>
                                     <Input 
+                                        placeholder='Password'
                                         type={showPassword ? "text" : "password"} 
                                         id="Password" 
                                         value={password} 
@@ -140,7 +141,7 @@
                             <Button 
                                 type="submit" 
                                 disabled={isLoading}
-                                className='w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-6 mt-2'
+                                className='w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-6 mt-2'
                             >
                                 {isLoading ? <Loader2 className="animate-spin mr-2" /> : "Log in"}
                             </Button>
